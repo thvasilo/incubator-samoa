@@ -64,7 +64,7 @@ import org.slf4j.LoggerFactory;
  * @author Arinto Murdopo
  * 
  */
-final class ModelAggregatorProcessor implements Processor {
+public final class ModelAggregatorProcessor implements Processor {
 
   private static final long serialVersionUID = -1685875718300564886L;
   private static final Logger logger = LoggerFactory.getLogger(ModelAggregatorProcessor.class);
@@ -366,7 +366,7 @@ final class ModelAggregatorProcessor implements Processor {
     return getVotesForInstance(inst, false);
   }
 
-  private double[] getVotesForInstance(Instance inst, boolean isTraining) {
+  public double[] getVotesForInstance(Instance inst, boolean isTraining) {
     double[] ret;
     FoundNode foundNode = null;
     if (this.treeRoot != null) {
@@ -650,7 +650,7 @@ final class ModelAggregatorProcessor implements Processor {
    * @author Arinto Murdopo
    * 
    */
-  static class Builder {
+  public static class Builder {
 
     // required parameters
     private final Instances dataset;
@@ -664,7 +664,7 @@ final class ModelAggregatorProcessor implements Processor {
     private long timeOut = 30;
     private ChangeDetector changeDetector = null;
 
-    Builder(Instances dataset) {
+    public Builder(Instances dataset) {
       this.dataset = dataset;
     }
 
@@ -713,7 +713,7 @@ final class ModelAggregatorProcessor implements Processor {
       return this;
     }
 
-    ModelAggregatorProcessor build() {
+    public ModelAggregatorProcessor build() {
       return new ModelAggregatorProcessor(this);
     }
   }
