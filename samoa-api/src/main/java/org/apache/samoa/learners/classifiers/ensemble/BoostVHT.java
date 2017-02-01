@@ -171,7 +171,7 @@ public class BoostVHT implements ClassificationLearner, Configurable {
     resultStream = this.builder.createStream(maP);  //prediction is computed in maP
     
     //set the out streams of the BoostVHTProcessor
-    maP.setOutputStream(resultStream);
+    maP.setResultStream(resultStream);
     maP.setAttributeStream(attributeStream);
     maP.setControlStream(controlStream);
 
