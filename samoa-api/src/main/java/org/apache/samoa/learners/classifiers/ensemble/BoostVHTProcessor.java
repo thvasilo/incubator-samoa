@@ -102,15 +102,18 @@ public class BoostVHTProcessor implements Processor {
     
     if (inEvent.isTesting()) {
       Instance testInstance = inEvent.getInstance();
+      double[][] predictionsPerEnsemble = new double[ensembleSize][];
+      
       for (int i = 0; i < ensembleSize; i++) {
         Instance instanceCopy = testInstance.copy();
         InstanceContentEvent instanceContentEvent = new InstanceContentEvent(inEvent.getInstanceIndex(), instanceCopy,
             false, true);
         instanceContentEvent.setClassifierIndex(i); //TODO probably not needed anymore
         instanceContentEvent.setEvaluationIndex(inEvent.getEvaluationIndex()); //TODO probably not needed anymore
-        
-        double[] votes = mAPEnsemble[i].getVotesForInstance(testInstance);
+  
+        predictionsPerEnsemble[i] = mAPEnsemble[i].getVotesForInstance(testInstance);
       }
+      computeBoosting(predictionsPerEnsemble);
     }
 
     // estimate model parameters using the training data
@@ -119,18 +122,6 @@ public class BoostVHTProcessor implements Processor {
     }
     return true;
   }
-
-  
-//      if (event instanceof InstanceContentEvent) {
-//         InstanceContentEvent instanceEvent = (InstanceContentEvent) event;
-//         Instance inst = instanceEvent.getInstance();
-//         for (int i = 0; i < ensembleSize; i++) {
-//             double[] votes = modelAggregatorProcessors[i].getVotesForInstance(inst, false);
-//          }
-//       }
-//       return false;
-  
-  
   
   /**
    * Train.
@@ -149,7 +140,6 @@ public class BoostVHTProcessor implements Processor {
             weightedInstance, true, false);
         instanceContentEvent.setClassifierIndex(i);
         instanceContentEvent.setEvaluationIndex(inEvent.getEvaluationIndex());
-//        ensembleStreams[i].put(instanceContentEvent);
       }
     }
   }
@@ -176,6 +166,11 @@ public class BoostVHTProcessor implements Processor {
       //todo:: check if the below is needed. Should we add each MA in the topology?
 //      this.builder.addProcessor(modelEnsemble[i], 1); //modelAggregatorParallelism = 1
     }
+    
+  }
+  
+  // todo:: use also the boosting algo and the training weight for each model to compute the final result and put it to the resultStream
+  private void computeBoosting(double[][] predictionsPerEnsemble) {
     
   }
   
