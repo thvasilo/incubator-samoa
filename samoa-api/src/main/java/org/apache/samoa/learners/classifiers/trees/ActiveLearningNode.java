@@ -23,12 +23,14 @@ package org.apache.samoa.learners.classifiers.trees;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.samoa.learners.classifiers.ModelAggregator;
 import org.apache.samoa.instances.Instance;
+import org.apache.samoa.learners.classifiers.ensemble.BoostMAProcessor;
 import org.apache.samoa.moa.classifiers.core.AttributeSplitSuggestion;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-final class ActiveLearningNode extends LearningNode {
+public final class ActiveLearningNode extends LearningNode {
   /**
 	 * 
 	 */
@@ -49,7 +51,7 @@ final class ActiveLearningNode extends LearningNode {
 
   private boolean isSplitting;
 
-  ActiveLearningNode(double[] classObservation, int parallelismHint) {
+  public ActiveLearningNode(double[] classObservation, int parallelismHint) {
     super(classObservation);
     this.weightSeenAtLastSplitEvaluation = this.getWeightSeen();
     this.id = VerticalHoeffdingTree.LearningNodeIdGenerator.generate();
@@ -62,7 +64,7 @@ final class ActiveLearningNode extends LearningNode {
     return id;
   }
 
-  protected AttributeBatchContentEvent[] attributeBatchContentEvent;
+  public AttributeBatchContentEvent[] attributeBatchContentEvent;
 
   public AttributeBatchContentEvent[] getAttributeBatchContentEvent() {
     return this.attributeBatchContentEvent;
@@ -73,7 +75,7 @@ final class ActiveLearningNode extends LearningNode {
   }
 
   @Override
-  void learnFromInstance(Instance inst, ModelAggregatorProcessor proc) {
+  public void learnFromInstance(Instance inst, ModelAggregator proc) {
     // TODO: what statistics should we keep for unused instance?
     if (isSplitting) { // currently throw all instance will splitting
       this.thrownAwayInstance++;
@@ -120,33 +122,39 @@ final class ActiveLearningNode extends LearningNode {
   }
 
   @Override
-  double[] getClassVotes(Instance inst, ModelAggregatorProcessor map) {
+  public double[] getClassVotes(Instance inst, ModelAggregator map) {
     return this.observedClassDistribution.getArrayCopy();
   }
 
-  double getWeightSeen() {
+  public double getWeightSeen() {
     return this.observedClassDistribution.sumOfValues();
   }
 
-  void setWeightSeenAtLastSplitEvaluation(double weight) {
+  public void setWeightSeenAtLastSplitEvaluation(double weight) {
     this.weightSeenAtLastSplitEvaluation = weight;
   }
 
-  double getWeightSeenAtLastSplitEvaluation() {
+  public double getWeightSeenAtLastSplitEvaluation() {
     return this.weightSeenAtLastSplitEvaluation;
   }
 
-  void requestDistributedSuggestions(long splitId, ModelAggregatorProcessor modelAggrProc) {
+  public void requestDistributedSuggestions(long splitId, ModelAggregator modelAggrProc) {
     this.isSplitting = true;
     this.suggestionCtr = 0;
     this.thrownAwayInstance = 0;
 
     ComputeContentEvent cce = new ComputeContentEvent(splitId, this.id,
         this.getObservedClassDistribution());
-    modelAggrProc.sendToControlStream(cce);
+    if (modelAggrProc instanceof  ModelAggregatorProcessor){
+      ModelAggregatorProcessor map = (ModelAggregatorProcessor)modelAggrProc;
+      map.sendToControlStream(cce);
+    } else if(modelAggrProc instanceof BoostMAProcessor) {
+      BoostMAProcessor map = (BoostMAProcessor)modelAggrProc;
+      map.sendToControlStream(cce);
+    }
   }
 
-  void addDistributedSuggestions(AttributeSplitSuggestion bestSuggestion, AttributeSplitSuggestion secondBestSuggestion) {
+  public void addDistributedSuggestions(AttributeSplitSuggestion bestSuggestion, AttributeSplitSuggestion secondBestSuggestion) {
     // starts comparing from the best suggestion
     if (bestSuggestion != null) {
       if ((this.bestSuggestion == null) || (bestSuggestion.compareTo(this.bestSuggestion) > 0)) {
@@ -170,11 +178,11 @@ final class ActiveLearningNode extends LearningNode {
     this.suggestionCtr++;
   }
 
-  boolean isSplitting() {
+  public boolean isSplitting() {
     return this.isSplitting;
   }
 
-  void endSplitting() {
+  public void endSplitting() {
     this.isSplitting = false;
     logger.trace("wasted instance: {}", this.thrownAwayInstance);
     this.thrownAwayInstance = 0;
@@ -182,15 +190,15 @@ final class ActiveLearningNode extends LearningNode {
     this.secondBestSuggestion = null;
   }
 
-  AttributeSplitSuggestion getDistributedBestSuggestion() {
+  public AttributeSplitSuggestion getDistributedBestSuggestion() {
     return this.bestSuggestion;
   }
 
-  AttributeSplitSuggestion getDistributedSecondBestSuggestion() {
+  public AttributeSplitSuggestion getDistributedSecondBestSuggestion() {
     return this.secondBestSuggestion;
   }
 
-  boolean isAllSuggestionsCollected() {
+  public boolean isAllSuggestionsCollected() {
     return (this.suggestionCtr == this.parallelismHint);
   }
 

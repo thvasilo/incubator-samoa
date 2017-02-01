@@ -1,4 +1,4 @@
-package org.apache.samoa.learners.classifiers.trees;
+package org.apache.samoa.learners.classifiers.ensemble;
 
 /*
  * #%L
@@ -20,7 +20,31 @@ package org.apache.samoa.learners.classifiers.trees;
  * #L%
  */
 
-import static org.apache.samoa.moa.core.Utils.maxIndex;
+import org.apache.samoa.core.ContentEvent;
+import org.apache.samoa.core.Processor;
+import org.apache.samoa.instances.Instance;
+import org.apache.samoa.instances.Instances;
+import org.apache.samoa.instances.InstancesHeader;
+import org.apache.samoa.learners.InstanceContent;
+import org.apache.samoa.learners.InstancesContentEvent;
+import org.apache.samoa.learners.ResultContentEvent;
+import org.apache.samoa.learners.classifiers.ModelAggregator;
+import org.apache.samoa.learners.classifiers.trees.ActiveLearningNode;
+import org.apache.samoa.learners.classifiers.trees.AttributeBatchContentEvent;
+import org.apache.samoa.learners.classifiers.trees.FoundNode;
+import org.apache.samoa.learners.classifiers.trees.InactiveLearningNode;
+import org.apache.samoa.learners.classifiers.trees.LearningNode;
+import org.apache.samoa.learners.classifiers.trees.LocalResultContentEvent;
+import org.apache.samoa.learners.classifiers.trees.ModelAggregatorProcessor;
+import org.apache.samoa.learners.classifiers.trees.Node;
+import org.apache.samoa.learners.classifiers.trees.SplitNode;
+import org.apache.samoa.moa.classifiers.core.AttributeSplitSuggestion;
+import org.apache.samoa.moa.classifiers.core.driftdetection.ChangeDetector;
+import org.apache.samoa.moa.classifiers.core.splitcriteria.InfoGainSplitCriterion;
+import org.apache.samoa.moa.classifiers.core.splitcriteria.SplitCriterion;
+import org.apache.samoa.topology.Stream;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
 import java.util.HashSet;
@@ -36,22 +60,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.samoa.core.ContentEvent;
-import org.apache.samoa.core.Processor;
-import org.apache.samoa.instances.Instance;
-import org.apache.samoa.instances.Instances;
-import org.apache.samoa.instances.InstancesHeader;
-import org.apache.samoa.learners.InstanceContent;
-import org.apache.samoa.learners.InstancesContentEvent;
-import org.apache.samoa.learners.ResultContentEvent;
-import org.apache.samoa.learners.classifiers.ModelAggregator;
-import org.apache.samoa.moa.classifiers.core.AttributeSplitSuggestion;
-import org.apache.samoa.moa.classifiers.core.driftdetection.ChangeDetector;
-import org.apache.samoa.moa.classifiers.core.splitcriteria.InfoGainSplitCriterion;
-import org.apache.samoa.moa.classifiers.core.splitcriteria.SplitCriterion;
-import org.apache.samoa.topology.Stream;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static org.apache.samoa.moa.core.Utils.maxIndex;
 
 /**
  * Model Aggegator Processor consists of the decision tree model. It connects to local-statistic PI via attribute stream
@@ -65,11 +74,11 @@ import org.slf4j.LoggerFactory;
  * @author Arinto Murdopo
  * 
  */
-public class ModelAggregatorProcessor extends ModelAggregator implements Processor {
+public final class BoostMAProcessor extends ModelAggregator implements Processor {
 
   private static final long serialVersionUID = -1685875718300564886L;
-  private static final Logger logger = LoggerFactory.getLogger(ModelAggregatorProcessor.class);
-
+  private static final Logger logger = LoggerFactory.getLogger(BoostMAProcessor.class);
+  
   private int processorId;
 
   private Node treeRoot;
@@ -87,9 +96,9 @@ public class ModelAggregatorProcessor extends ModelAggregator implements Process
   private BlockingQueue<Long> timedOutSplittingNodes;
 
   // available streams
-  private Stream resultStream;
-  private Stream attributeStream;
-  private Stream controlStream;
+//  private Stream resultStream;
+//  private Stream attributeStream;
+//  private Stream controlStream;
 
   private transient ScheduledExecutorService executor;
 
@@ -100,8 +109,11 @@ public class ModelAggregatorProcessor extends ModelAggregator implements Process
   private final int parallelismHint;
   private final long timeOut;
   
+  //the "parent" processor that boosting takes place. We need it for the streams
+  private final BoostVHTProcessor boostProc;
+
   // private constructor based on Builder pattern
-  private ModelAggregatorProcessor(Builder builder) {
+  private BoostMAProcessor(Builder builder) {
     this.dataset = builder.dataset;
     this.splitCriterion = builder.splitCriterion;
     this.splitConfidence = builder.splitConfidence;
@@ -109,12 +121,12 @@ public class ModelAggregatorProcessor extends ModelAggregator implements Process
     this.gracePeriod = builder.gracePeriod;
     this.parallelismHint = builder.parallelismHint;
     this.timeOut = builder.timeOut;
-    this.changeDetector = builder.changeDetector;
+    this.boostProc = builder.boostProc;
 
     InstancesHeader ih = new InstancesHeader(dataset);
     this.setModelContext(ih);
   }
-  
+
   @Override
   public boolean process(ContentEvent event) {
 
@@ -143,7 +155,7 @@ public class ModelAggregatorProcessor extends ModelAggregator implements Process
           AttributeBatchContentEvent[] abce = leafNode.getAttributeBatchContentEvent();
           if (abce != null) {
             for (int i = 0; i < this.dataset.numAttributes() - 1; i++) {
-              this.sendToAttributeStream(abce[i]);
+              this.sendToAttributeStream(abce[i]); //todo:: how do we need to change this?
             }
           }
           leafNode.setAttributeBatchContentEvent(null);
@@ -202,12 +214,12 @@ public class ModelAggregatorProcessor extends ModelAggregator implements Process
 
   @Override
   public Processor newProcessor(Processor p) {
-    ModelAggregatorProcessor oldProcessor = (ModelAggregatorProcessor) p;
-    ModelAggregatorProcessor newProcessor = new ModelAggregatorProcessor.Builder(oldProcessor).build();
+    BoostMAProcessor oldProcessor = (BoostMAProcessor) p;
+    BoostMAProcessor newProcessor = new BoostMAProcessor.Builder(oldProcessor).build();
 
-    newProcessor.setResultStream(oldProcessor.resultStream);
-    newProcessor.setAttributeStream(oldProcessor.attributeStream);
-    newProcessor.setControlStream(oldProcessor.controlStream);
+//    newProcessor.setResultStream(oldProcessor.resultStream);
+//    newProcessor.setAttributeStream(oldProcessor.attributeStream);
+//    newProcessor.setControlStream(oldProcessor.controlStream);
     return newProcessor;
   }
 
@@ -223,24 +235,25 @@ public class ModelAggregatorProcessor extends ModelAggregator implements Process
     return sb.toString();
   }
 
-  public void setResultStream(Stream resultStream) {
-    this.resultStream = resultStream;
-  }
+//  public void setResultStream(Stream resultStream) {
+//    this.resultStream = resultStream;
+//  }
+//
+//  public void setAttributeStream(Stream attributeStream) {
+//    this.attributeStream = attributeStream;
+//  }
+//
+//  public void setControlStream(Stream controlStream) {
+//    this.controlStream = controlStream;
+//  }
 
-  public void setAttributeStream(Stream attributeStream) {
-    this.attributeStream = attributeStream;
-  }
-
-  public void setControlStream(Stream controlStream) {
-    this.controlStream = controlStream;
-  }
-
+  //todo:: is there any reason to synchronize these two methods?
   void sendToAttributeStream(ContentEvent event) {
-    this.attributeStream.put(event);
+    this.boostProc.getAttributeStream().put(event);
   }
 
-  void sendToControlStream(ContentEvent event) {
-    this.controlStream.put(event);
+  public void sendToControlStream(ContentEvent event) {
+    this.boostProc.getControlStream().put(event);
   }
 
   /**
@@ -296,7 +309,7 @@ public class ModelAggregatorProcessor extends ModelAggregator implements Process
       double[] prediction = null;
       if (isTesting) {
         prediction = getVotesForInstance(inst, false);
-        this.resultStream.put(newResultContentEvent(prediction, instContent));
+        this.boostProc.getResultStream().put(newResultContentEvent(prediction, instContent));
       }
 
       if (isTraining) {
@@ -457,7 +470,7 @@ public class ModelAggregatorProcessor extends ModelAggregator implements Process
       this.splittingNodes.put(this.splitId, new SplittingNodeInfo(activeLearningNode, foundNode, timeOutHandler));
 
       // Inform Local Statistic PI to perform local statistic calculation
-      activeLearningNode.requestDistributedSuggestions(this.splitId, this);
+      activeLearningNode.requestDistributedSuggestions(this.splitId, this); // todo:: what to do???
     }
   }
 
@@ -647,9 +660,9 @@ public class ModelAggregatorProcessor extends ModelAggregator implements Process
 
   /**
    * Builder class to replace constructors with many parameters
-   * 
+   *
    * @author Arinto Murdopo
-   * 
+   *
    */
   public static class Builder {
 
@@ -664,12 +677,13 @@ public class ModelAggregatorProcessor extends ModelAggregator implements Process
     private int parallelismHint = 1;
     private long timeOut = 30;
     private ChangeDetector changeDetector = null;
-
+    private BoostVHTProcessor boostProc = null;
+  
     public Builder(Instances dataset) {
       this.dataset = dataset;
     }
 
-    public Builder(ModelAggregatorProcessor oldProcessor) {
+    public Builder(BoostMAProcessor oldProcessor) {
       this.dataset = oldProcessor.dataset;
       this.splitCriterion = oldProcessor.splitCriterion;
       this.splitConfidence = oldProcessor.splitConfidence;
@@ -677,6 +691,7 @@ public class ModelAggregatorProcessor extends ModelAggregator implements Process
       this.gracePeriod = oldProcessor.gracePeriod;
       this.parallelismHint = oldProcessor.parallelismHint;
       this.timeOut = oldProcessor.timeOut;
+      this.boostProc = oldProcessor.boostProc;
     }
   
     public Builder splitCriterion(SplitCriterion splitCriterion) {
@@ -713,9 +728,14 @@ public class ModelAggregatorProcessor extends ModelAggregator implements Process
       this.changeDetector = changeDetector;
       return this;
     }
+    
+    public Builder setBoostProcessor(BoostVHTProcessor boostProc){
+      this.boostProc = boostProc;
+      return this;
+    }
   
-    public ModelAggregatorProcessor build() {
-      return new ModelAggregatorProcessor(this);
+    public BoostMAProcessor build() {
+      return new BoostMAProcessor(this);
     }
   }
 

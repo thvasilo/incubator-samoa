@@ -30,7 +30,7 @@ import org.apache.samoa.moa.classifiers.core.AttributeSplitSuggestion;
  * @author Arinto Murdopo
  * 
  */
-final class LocalResultContentEvent implements ContentEvent {
+public final class LocalResultContentEvent implements ContentEvent {
 
   private static final long serialVersionUID = -4206620993777418571L;
 
@@ -60,7 +60,7 @@ final class LocalResultContentEvent implements ContentEvent {
    * 
    * @return The best attribute split suggestion.
    */
-  AttributeSplitSuggestion getBestSuggestion() {
+  public AttributeSplitSuggestion getBestSuggestion() {
     return this.bestSuggestion;
   }
 
@@ -69,7 +69,7 @@ final class LocalResultContentEvent implements ContentEvent {
    * 
    * @return The second best attribute split suggestion.
    */
-  AttributeSplitSuggestion getSecondBestSuggestion() {
+  public AttributeSplitSuggestion getSecondBestSuggestion() {
     return this.secondBestSuggestion;
   }
 
@@ -78,7 +78,7 @@ final class LocalResultContentEvent implements ContentEvent {
    * 
    * @return The split id of this local calculation result
    */
-  long getSplitId() {
+  public long getSplitId() {
     return this.splitId;
   }
 

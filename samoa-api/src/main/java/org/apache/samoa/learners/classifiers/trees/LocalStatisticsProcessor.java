@@ -47,7 +47,7 @@ import com.google.common.collect.Table;
  * @author Arinto Murdopo
  * 
  */
-final class LocalStatisticsProcessor implements Processor {
+public final class LocalStatisticsProcessor implements Processor {
 
   /**
 	 * 
@@ -180,7 +180,7 @@ final class LocalStatisticsProcessor implements Processor {
    * 
    * @param computeStream
    */
-  void setComputationResultStream(Stream computeStream) {
+  public void setComputationResultStream(Stream computeStream) {
     this.computationResultStream = computeStream;
   }
 
@@ -198,43 +198,43 @@ final class LocalStatisticsProcessor implements Processor {
    * @author Arinto Murdopo
    * 
    */
-  static class Builder {
+  public static class Builder {
 
     private SplitCriterion splitCriterion = new InfoGainSplitCriterion();
     private boolean binarySplit = false;
     private AttributeClassObserver nominalClassObserver = new NominalAttributeClassObserver();
     private AttributeClassObserver numericClassObserver = new GaussianNumericAttributeClassObserver();
 
-    Builder() {
+    public Builder() {
 
     }
 
-    Builder(LocalStatisticsProcessor oldProcessor) {
+    public Builder(LocalStatisticsProcessor oldProcessor) {
       this.splitCriterion = oldProcessor.splitCriterion;
       this.binarySplit = oldProcessor.binarySplit;
     }
 
-    Builder splitCriterion(SplitCriterion splitCriterion) {
+    public Builder splitCriterion(SplitCriterion splitCriterion) {
       this.splitCriterion = splitCriterion;
       return this;
     }
 
-    Builder binarySplit(boolean binarySplit) {
+    public Builder binarySplit(boolean binarySplit) {
       this.binarySplit = binarySplit;
       return this;
     }
 
-    Builder nominalClassObserver(AttributeClassObserver nominalClassObserver) {
+    public Builder nominalClassObserver(AttributeClassObserver nominalClassObserver) {
       this.nominalClassObserver = nominalClassObserver;
       return this;
     }
 
-    Builder numericClassObserver(AttributeClassObserver numericClassObserver) {
+    public Builder numericClassObserver(AttributeClassObserver numericClassObserver) {
       this.numericClassObserver = numericClassObserver;
       return this;
     }
 
-    LocalStatisticsProcessor build() {
+    public LocalStatisticsProcessor build() {
       return new LocalStatisticsProcessor(this);
     }
   }

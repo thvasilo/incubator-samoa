@@ -73,7 +73,7 @@ public class SplitNode extends Node {
    * 
    * @return number of children
    */
-  int numChildren() {
+  public int numChildren() {
     return this.children.size();
   }
 
@@ -85,7 +85,7 @@ public class SplitNode extends Node {
    * @param child
    *          The child node
    */
-  void setChild(int index, Node child) {
+  public void setChild(int index, Node child) {
     if ((this.splitTest.maxBranches() >= 0)
         && (index >= this.splitTest.maxBranches())) {
       throw new IndexOutOfBoundsException();
@@ -100,7 +100,7 @@ public class SplitNode extends Node {
    *          The child node index
    * @return The child node in the given index
    */
-  Node getChild(int index) {
+  public Node getChild(int index) {
     return this.children.get(index);
   }
 
