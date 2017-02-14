@@ -140,7 +140,7 @@ public class BoostVHT implements ClassificationLearner, Configurable {
     maP.setTimeOut(this.timeOutOption.getValue());
     maP.setInputInstances(this.dataset);
     
-    //add Boosting Model Aggrgegator Processor to the topology
+    //add Boosting Model Aggregator Processor to the topology
     this.builder.addProcessor(maP, 1);
     
 

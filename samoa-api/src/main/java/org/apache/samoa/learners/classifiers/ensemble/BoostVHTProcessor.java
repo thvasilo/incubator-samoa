@@ -75,14 +75,21 @@ public class BoostVHTProcessor implements Processor {
   /** The attribute stream. */
   private Stream attributeStream;
   
-//  /** The input streams of each MA (of the ensemble). */
-//  private Stream ensembleInputStream; //todo:: check if needed
-  
   protected BoostMAProcessor[] mAPEnsemble;
 
   /** Ramdom number generator. */
   protected Random random = new Random(); //TODO make random seed configurable
 
+  //-----
+  // Weigths classifier
+  protected double[] scms;
+  
+  // Weights instance
+  protected double[] swms;
+  
+  protected double trainingWeightSeenByModel; //todo:: (Faye) when is this updated?
+  //-----
+  
   /**
    * On event.
    * 
@@ -90,11 +97,11 @@ public class BoostVHTProcessor implements Processor {
    * @return true, if successful
    */
   public boolean process(ContentEvent event) {
-   //todo:: check if any precondition is needed
+   //todo:: (Faye) check if any precondition is needed
     InstanceContentEvent inEvent = (InstanceContentEvent) event;
 
 //    if (inEvent.getInstanceIndex() < 0) {
-//      // end learning
+//      end learning
 //      for (Stream stream : ensembleStreams)
 //        stream.put(event);
 //      return false;
@@ -131,16 +138,36 @@ public class BoostVHTProcessor implements Processor {
    */
   protected void train(InstanceContentEvent inEvent) {
     Instance trainInstance = inEvent.getInstance();
-    for (int i = 0; i < ensembleSize; i++) {
-      int k = MiscUtils.poisson(1.0, this.random);
+  
+    double lambda_d = 1.0; //set the example's weight
+    
+    for (int i = 0; i < ensembleSize; i++) { //for each base model
+      int k = MiscUtils.poisson(1.0, this.random); //set k according to poisson
+  
+      Instance weightedInstance = trainInstance.copy();
       if (k > 0) {
-        Instance weightedInstance = trainInstance.copy();
+        //todo:: (Faye) do we need the following 4 lines? The "*k" is not in the algo pseudo-code.
         weightedInstance.setWeight(trainInstance.weight() * k);
         InstanceContentEvent instanceContentEvent = new InstanceContentEvent(inEvent.getInstanceIndex(),
-            weightedInstance, true, false);
+                
+                weightedInstance, true, false);
         instanceContentEvent.setClassifierIndex(i);
         instanceContentEvent.setEvaluationIndex(inEvent.getEvaluationIndex());
+  
+        mAPEnsemble[i].process(instanceContentEvent);
       }
+        //get prediction for the instance from the specific learner of the ensemble
+        double[] prediction = mAPEnsemble[i].getVotesForInstance(weightedInstance);
+        
+      //correctlyClassifies method of BoostMAProcessor
+        if (mAPEnsemble[i].correctlyClassifies(weightedInstance,prediction)) {
+          this.trainingWeightSeenByModel = this.mAPEnsemble[i].getWeightSeenByModel();
+          this.scms[i] += lambda_d;
+          lambda_d *= this.trainingWeightSeenByModel / (2 * this.scms[i]);
+        } else {
+          this.swms[i] += lambda_d;
+          lambda_d *= this.trainingWeightSeenByModel / (2 * this.swms[i]);
+        }
     }
   }
 
@@ -150,9 +177,9 @@ public class BoostVHTProcessor implements Processor {
     mAPEnsemble = new BoostMAProcessor[ensembleSize];
 //    subResultStreams = new Stream[ensembleSize];
     
-    //----instantiate the rest of the MAs
+    //----instantiate the MAs
     for (int i = 0; i < ensembleSize; i++) {
-      //todo::  what dataset should we pass in each MA that we instantiate?
+      //todo::  (Faye) what dataset should we pass in each MA that we instantiate?
       mAPEnsemble[i] = new BoostMAProcessor.Builder(dataset)
               .splitCriterion(splitCriterion)
               .splitConfidence(splitConfidence)
@@ -162,16 +189,21 @@ public class BoostVHTProcessor implements Processor {
               .timeOut(timeOut)
               .setBoostProcessor(this)
               .build();
-  
-      //todo:: check if the below is needed. Should we add each MA in the topology?
-//      this.builder.addProcessor(modelEnsemble[i], 1); //modelAggregatorParallelism = 1
     }
     
   }
   
-  // todo:: use also the boosting algo and the training weight for each model to compute the final result and put it to the resultStream
+  // todo:: (Faye) use also the boosting algo and the training weight for each model to compute the final result and put it to the resultStream
   private void computeBoosting(double[][] predictionsPerEnsemble) {
-    
+  }
+  
+  private double getEnsembleMemberWeight(int i) {
+    double em = this.swms[i] / (this.scms[i] + this.swms[i]);
+    if ((em == 0.0) || (em > 0.5)) {
+      return 0.0;
+    }
+    double Bm = em / (1.0 - em);
+    return Math.log(1.0 / Bm);
   }
   
   public Instances getInputInstances() {

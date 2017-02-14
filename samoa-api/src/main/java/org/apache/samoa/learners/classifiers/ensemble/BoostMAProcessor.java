@@ -109,6 +109,9 @@ public final class BoostMAProcessor extends ModelAggregator implements Processor
   private final int parallelismHint;
   private final long timeOut;
   
+  //
+  private double weightSeenByModel;
+  
   //the "parent" processor that boosting takes place. We need it for the streams
   private final BoostVHTProcessor boostProc;
 
@@ -155,7 +158,7 @@ public final class BoostMAProcessor extends ModelAggregator implements Processor
           AttributeBatchContentEvent[] abce = leafNode.getAttributeBatchContentEvent();
           if (abce != null) {
             for (int i = 0; i < this.dataset.numAttributes() - 1; i++) {
-              this.sendToAttributeStream(abce[i]); //todo:: how do we need to change this?
+              this.sendToAttributeStream(abce[i]);
             }
           }
           leafNode.setAttributeBatchContentEvent(null);
@@ -168,6 +171,9 @@ public final class BoostMAProcessor extends ModelAggregator implements Processor
               attemptToSplit(leafNode, foundNode);
             }
           }
+          //todo(faye) the below is added for boostVHT
+          //set the weight seen by model
+          this.weightSeenByModel = leafNode.getWeightSeen();
         }
       }
       this.foundNodeSet = null;
@@ -332,7 +338,7 @@ public final class BoostMAProcessor extends ModelAggregator implements Processor
     }
   }
 
-  private boolean correctlyClassifies(Instance inst, double[] prediction) {
+  protected boolean correctlyClassifies(Instance inst, double[] prediction) {
     return maxIndex(prediction) == (int) inst.classValue();
   }
 
@@ -739,4 +745,10 @@ public final class BoostMAProcessor extends ModelAggregator implements Processor
     }
   }
 
+  //added for boostVHT
+  
+  public double getWeightSeenByModel() {
+    return weightSeenByModel;
+  }
+  
 }
