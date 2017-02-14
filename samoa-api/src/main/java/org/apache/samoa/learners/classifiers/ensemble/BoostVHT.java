@@ -87,7 +87,6 @@ public class BoostVHT implements ClassificationLearner, Configurable {
 
   public FlagOption binarySplitsOption = new FlagOption("binarySplits", 'b',
           "Only allow binary splits.");
-
   
   /** The base learner option. */
   public ClassOption baseLearnerOption = new ClassOption("baseLearner", 'l',
@@ -119,6 +118,12 @@ public class BoostVHT implements ClassificationLearner, Configurable {
   private Instances dataset;
 
   protected int parallelism;
+  
+  //for SAMMME
+  public IntOption numberOfClassesOption = new IntOption("numberOfClasses", 'k',
+          "The number of classes.", 2, 2, Integer.MAX_VALUE); //for SAMME
+  
+  //---
 
   /**
    * Sets the layout.
@@ -139,6 +144,8 @@ public class BoostVHT implements ClassificationLearner, Configurable {
     maP.setParallelismHint(this.parallelismHintOption.getValue());
     maP.setTimeOut(this.timeOutOption.getValue());
     maP.setInputInstances(this.dataset);
+  
+    maP.setNumOfClasses(this.numberOfClassesOption.getValue());
     
     //add Boosting Model Aggregator Processor to the topology
     this.builder.addProcessor(maP, 1);

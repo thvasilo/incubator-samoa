@@ -261,24 +261,7 @@ public final class BoostMAProcessor extends ModelAggregator implements Processor
   public void sendToControlStream(ContentEvent event) {
     this.boostProc.getControlStream().put(event);
   }
-
-  /**
-   * Helper method to generate new ResultContentEvent based on an instance and its prediction result.
-   * 
-   * @param prediction
-   *          The predicted class label from the decision tree model.
-   * @param inEvent
-   *          The associated instance content event
-   * @return ResultContentEvent to be sent into Evaluator PI or other destination PI.
-   */
-  private ResultContentEvent newResultContentEvent(double[] prediction, InstanceContent inEvent) {
-    ResultContentEvent rce = new ResultContentEvent(inEvent.getInstanceIndex(), inEvent.getInstance(),
-        inEvent.getClassId(), prediction, inEvent.isLastEvent());
-    rce.setClassifierIndex(this.processorId);
-    rce.setEvaluationIndex(inEvent.getEvaluationIndex());
-    return rce;
-  }
-
+  
   private List<InstancesContentEvent> contentEventList = new LinkedList<>();
 
   /**
@@ -314,8 +297,9 @@ public final class BoostMAProcessor extends ModelAggregator implements Processor
       // boolean testAndTrain = isTraining; //Train after testing
       double[] prediction = null;
       if (isTesting) {
-        prediction = getVotesForInstance(inst, false);
-        this.boostProc.getResultStream().put(newResultContentEvent(prediction, instContent));
+        //todo(faye) no need to put any result in the stream (this would be a sub-result)
+//        prediction = getVotesForInstance(inst, false);
+//        this.boostProc.getResultStream().put(newResultContentEvent(prediction, instContent));
       }
 
       if (isTraining) {

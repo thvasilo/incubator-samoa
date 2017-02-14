@@ -24,8 +24,11 @@ import org.apache.samoa.core.ContentEvent;
 import org.apache.samoa.core.Processor;
 import org.apache.samoa.instances.Instance;
 import org.apache.samoa.instances.Instances;
+import org.apache.samoa.learners.InstanceContent;
 import org.apache.samoa.learners.InstanceContentEvent;
+import org.apache.samoa.learners.ResultContentEvent;
 import org.apache.samoa.moa.classifiers.core.splitcriteria.SplitCriterion;
+import org.apache.samoa.moa.core.DoubleVector;
 import org.apache.samoa.moa.core.MiscUtils;
 import org.apache.samoa.topology.Stream;
 import org.apache.samoa.topology.TopologyBuilder;
@@ -90,6 +93,10 @@ public class BoostVHTProcessor implements Processor {
   protected double trainingWeightSeenByModel; //todo:: (Faye) when is this updated?
   //-----
   
+  
+  //---for SAMME
+  private int numOfClasses;
+  //---
   /**
    * On event.
    * 
@@ -97,9 +104,9 @@ public class BoostVHTProcessor implements Processor {
    * @return true, if successful
    */
   public boolean process(ContentEvent event) {
-   //todo:: (Faye) check if any precondition is needed
+   
     InstanceContentEvent inEvent = (InstanceContentEvent) event;
-
+      //todo:: (Faye) check if any precondition is needed
 //    if (inEvent.getInstanceIndex() < 0) {
 //      end learning
 //      for (Stream stream : ensembleStreams)
@@ -108,19 +115,8 @@ public class BoostVHTProcessor implements Processor {
 //    }
     
     if (inEvent.isTesting()) {
-      Instance testInstance = inEvent.getInstance();
-      double[][] predictionsPerEnsemble = new double[ensembleSize][];
-      
-      for (int i = 0; i < ensembleSize; i++) {
-        Instance instanceCopy = testInstance.copy();
-        InstanceContentEvent instanceContentEvent = new InstanceContentEvent(inEvent.getInstanceIndex(), instanceCopy,
-            false, true);
-        instanceContentEvent.setClassifierIndex(i); //TODO probably not needed anymore
-        instanceContentEvent.setEvaluationIndex(inEvent.getEvaluationIndex()); //TODO probably not needed anymore
-  
-        predictionsPerEnsemble[i] = mAPEnsemble[i].getVotesForInstance(testInstance);
-      }
-      computeBoosting(predictionsPerEnsemble);
+      double[] combinedPrediction = computeBoosting(inEvent);
+      this.resultStream.put(newResultContentEvent(combinedPrediction,inEvent));
     }
 
     // estimate model parameters using the training data
@@ -129,57 +125,15 @@ public class BoostVHTProcessor implements Processor {
     }
     return true;
   }
-  
-  /**
-   * Train.
-   * 
-   * @param inEvent
-   *          the in event
-   */
-  protected void train(InstanceContentEvent inEvent) {
-    Instance trainInstance = inEvent.getInstance();
-  
-    double lambda_d = 1.0; //set the example's weight
-    
-    for (int i = 0; i < ensembleSize; i++) { //for each base model
-      int k = MiscUtils.poisson(1.0, this.random); //set k according to poisson
-  
-      Instance weightedInstance = trainInstance.copy();
-      if (k > 0) {
-        //todo:: (Faye) do we need the following 4 lines? The "*k" is not in the algo pseudo-code.
-        weightedInstance.setWeight(trainInstance.weight() * k);
-        InstanceContentEvent instanceContentEvent = new InstanceContentEvent(inEvent.getInstanceIndex(),
-                
-                weightedInstance, true, false);
-        instanceContentEvent.setClassifierIndex(i);
-        instanceContentEvent.setEvaluationIndex(inEvent.getEvaluationIndex());
-  
-        mAPEnsemble[i].process(instanceContentEvent);
-      }
-        //get prediction for the instance from the specific learner of the ensemble
-        double[] prediction = mAPEnsemble[i].getVotesForInstance(weightedInstance);
-        
-      //correctlyClassifies method of BoostMAProcessor
-        if (mAPEnsemble[i].correctlyClassifies(weightedInstance,prediction)) {
-          this.trainingWeightSeenByModel = this.mAPEnsemble[i].getWeightSeenByModel();
-          this.scms[i] += lambda_d;
-          lambda_d *= this.trainingWeightSeenByModel / (2 * this.scms[i]);
-        } else {
-          this.swms[i] += lambda_d;
-          lambda_d *= this.trainingWeightSeenByModel / (2 * this.swms[i]);
-        }
-    }
-  }
 
   @Override
   public void onCreate(int id) {
     
     mAPEnsemble = new BoostMAProcessor[ensembleSize];
-//    subResultStreams = new Stream[ensembleSize];
     
     //----instantiate the MAs
     for (int i = 0; i < ensembleSize; i++) {
-      //todo::  (Faye) what dataset should we pass in each MA that we instantiate?
+      //todo::  (Faye) what dataset should we pass in each MA that we instantiate? --> Ans: The same
       mAPEnsemble[i] = new BoostMAProcessor.Builder(dataset)
               .splitCriterion(splitCriterion)
               .splitConfidence(splitConfidence)
@@ -194,16 +148,91 @@ public class BoostVHTProcessor implements Processor {
   }
   
   // todo:: (Faye) use also the boosting algo and the training weight for each model to compute the final result and put it to the resultStream
-  private void computeBoosting(double[][] predictionsPerEnsemble) {
+  private double[] computeBoosting(InstanceContentEvent inEvent) {
+    
+    Instance testInstance = inEvent.getInstance();
+    DoubleVector combinedPredictions = new DoubleVector();
+  
+    for (int i = 0; i < ensembleSize; i++) {
+      double[] predictionsPerEnsemble = mAPEnsemble[i].getVotesForInstance(testInstance);
+      double memberWeight = getEnsembleMemberWeight(i);
+      if (memberWeight > 0.0) {
+        DoubleVector vote = new DoubleVector(predictionsPerEnsemble);
+        if (vote.sumOfValues() > 0.0) {
+          vote.normalize();
+          vote.scaleValues(memberWeight);
+          combinedPredictions.addValues(vote);
+        }
+      } else {
+        break;
+      }
+    }
+    return combinedPredictions.getArrayRef();
+  }
+  
+  /**
+   * Train.
+   *
+   * @param inEvent
+   *          the in event
+   */
+  protected void train(InstanceContentEvent inEvent) {
+    Instance trainInstance = inEvent.getInstance();
+    
+    double lambda_d = 1.0; //set the example's weight
+    
+    for (int i = 0; i < ensembleSize; i++) { //for each base model
+      int k = MiscUtils.poisson(1.0, this.random); //set k according to poisson
+      
+      Instance weightedInstance = trainInstance.copy();
+      if (k > 0) {
+        weightedInstance.setWeight(trainInstance.weight() * k);
+        InstanceContentEvent instanceContentEvent = new InstanceContentEvent(inEvent.getInstanceIndex(), weightedInstance, true, false);
+        instanceContentEvent.setClassifierIndex(i);
+        instanceContentEvent.setEvaluationIndex(inEvent.getEvaluationIndex());
+        
+        mAPEnsemble[i].process(instanceContentEvent);
+      }
+      //get prediction for the instance from the specific learner of the ensemble
+      double[] prediction = mAPEnsemble[i].getVotesForInstance(trainInstance);
+      
+      //correctlyClassifies method of BoostMAProcessor
+      if (mAPEnsemble[i].correctlyClassifies(trainInstance,prediction)) {
+        this.trainingWeightSeenByModel = this.mAPEnsemble[i].getWeightSeenByModel();
+        this.scms[i] += lambda_d;
+        lambda_d *= this.trainingWeightSeenByModel / (2 * this.scms[i]);
+      } else {
+        this.swms[i] += lambda_d;
+        lambda_d *= this.trainingWeightSeenByModel / (2 * this.swms[i]);
+      }
+    }
   }
   
   private double getEnsembleMemberWeight(int i) {
     double em = this.swms[i] / (this.scms[i] + this.swms[i]);
-    if ((em == 0.0) || (em > 0.5)) {
+//    if ((em == 0.0) || (em > 0.5)) {
+    if ((em == 0.0) || (em > (1.0 - 1.0/this.numOfClasses))) { //for SAMME
       return 0.0;
     }
     double Bm = em / (1.0 - em);
-    return Math.log(1.0 / Bm);
+//    return Math.log(1.0 / Bm);
+    return Math.log(1.0 / Bm ) + Math.log(this.numOfClasses - 1); //for SAMME
+  }
+  
+  /**
+   * Helper method to generate new ResultContentEvent based on an instance and its prediction result.
+   *
+   * @param combinedPrediction
+   *          The predicted class label from the Boost-VHT decision tree model.
+   * @param inEvent
+   *          The associated instance content event
+   * @return ResultContentEvent to be sent into Evaluator PI or other destination PI.
+   */
+  private ResultContentEvent newResultContentEvent(double[] combinedPrediction, InstanceContentEvent inEvent) {
+    ResultContentEvent rce = new ResultContentEvent(inEvent.getInstanceIndex(), inEvent.getInstance(),
+            inEvent.getClassId(), combinedPrediction, inEvent.isLastEvent());
+    rce.setEvaluationIndex(inEvent.getEvaluationIndex());
+    return rce;
   }
   
   public Instances getInputInstances() {
@@ -300,6 +329,14 @@ public class BoostVHTProcessor implements Processor {
   
   public void setTimeOut(int timeOut) {
     this.timeOut = timeOut;
+  }
+  
+  public int getNumOfClasses() {
+    return numOfClasses;
+  }
+  
+  public void setNumOfClasses(int numOfClasses) {
+    this.numOfClasses = numOfClasses;
   }
   
   @Override
