@@ -21,6 +21,7 @@ package org.apache.samoa.learners.classifiers.trees;
  */
 
 import org.apache.samoa.instances.Instance;
+import org.apache.samoa.learners.classifiers.ModelAggregator;
 import org.apache.samoa.moa.classifiers.core.conditionaltests.InstanceConditionalTest;
 import org.apache.samoa.moa.core.AutoExpandVector;
 
@@ -46,7 +47,7 @@ public class SplitNode extends Node {
   }
 
   @Override
-  FoundNode filterInstanceToLeaf(Instance inst, SplitNode parent, int parentBranch) {
+  public FoundNode filterInstanceToLeaf(Instance inst, SplitNode parent, int parentBranch) {
     int childIndex = instanceChildIndex(inst);
     if (childIndex >= 0) {
       Node child = getChild(childIndex);
@@ -64,7 +65,7 @@ public class SplitNode extends Node {
   }
 
   @Override
-  double[] getClassVotes(Instance inst, ModelAggregatorProcessor vht) {
+  public double[] getClassVotes(Instance inst, ModelAggregator vht) {
     return this.observedClassDistribution.getArrayCopy();
   }
 

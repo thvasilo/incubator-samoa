@@ -83,6 +83,10 @@ public class BoostVHTProcessor implements Processor {
   /** Ramdom number generator. */
   protected Random random = new Random(); //TODO make random seed configurable
 
+  private BoostVHTProcessor(Builder builder) {
+    this.dataset = builder.dataset;
+  }
+
   /**
    * On event.
    * 
@@ -99,11 +103,11 @@ public class BoostVHTProcessor implements Processor {
 //        stream.put(event);
 //      return false;
 //    }
-    
+
     if (inEvent.isTesting()) {
       Instance testInstance = inEvent.getInstance();
       double[][] predictionsPerEnsemble = new double[ensembleSize][];
-      
+
       for (int i = 0; i < ensembleSize; i++) {
         Instance instanceCopy = testInstance.copy();
         InstanceContentEvent instanceContentEvent = new InstanceContentEvent(inEvent.getInstanceIndex(), instanceCopy,
@@ -146,46 +150,63 @@ public class BoostVHTProcessor implements Processor {
 
   @Override
   public void onCreate(int id) {
-    
-    mAPEnsemble = new BoostMAProcessor[ensembleSize];
-//    subResultStreams = new Stream[ensembleSize];
-    
-    //----instantiate the rest of the MAs
+//
+//    mAPEnsemble = new BoostMAProcessor[ensembleSize];
+////    subResultStreams = new Stream[ensembleSize];
+//
+//    //----instantiate the rest of the MAs
     for (int i = 0; i < ensembleSize; i++) {
       //todo::  what dataset should we pass in each MA that we instantiate?
       mAPEnsemble[i] = new BoostMAProcessor.Builder(dataset)
-              .splitCriterion(splitCriterion)
-              .splitConfidence(splitConfidence)
-              .tieThreshold(tieThreshold)
-              .gracePeriod(gracePeriod)
-              .parallelismHint(parallelismHint)
-              .timeOut(timeOut)
-              .setBoostProcessor(this)
-              .build();
-  
+//              .splitCriterion(splitCriterion)
+//              .splitConfidence(splitConfidence)
+//              .tieThreshold(tieThreshold)
+//              .gracePeriod(gracePeriod)
+//              .timeOut(timeOut)
+          .parallelismHint(parallelismHint)
+          .setBoostProcessor(this)
+          .build();
+
       //todo:: check if the below is needed. Should we add each MA in the topology?
 //      this.builder.addProcessor(modelEnsemble[i], 1); //modelAggregatorParallelism = 1
     }
-    
+
   }
   
   // todo:: use also the boosting algo and the training weight for each model to compute the final result and put it to the resultStream
   private void computeBoosting(double[][] predictionsPerEnsemble) {
     
   }
-  
-  public Instances getInputInstances() {
-    return dataset;
+
+  public static class Builder {
+    // required parameters
+    private final Instances dataset;
+
+    private int ensembleSize;
+
+    public Builder(Instances dataset) {
+      this.dataset = dataset;
+    }
+
+    public Builder(BoostVHTProcessor vhtProcessor) {
+      this.dataset = vhtProcessor.dataset;
+    }
+
+    public Builder setEnsembleSize(int ensembleSize) {
+      this.ensembleSize = ensembleSize;
+      return this;
+    }
+
+    public BoostVHTProcessor build() {
+      return new BoostVHTProcessor(this);
+    }
   }
-  
-  public void setInputInstances(Instances dataset) {
-    this.dataset = dataset;
-  }
-  
+
+
   public Stream getResultStream() {
     return this.resultStream;
   }
-  
+
   public void setResultStream(Stream resultStream) {
     this.resultStream = resultStream;
   }
@@ -197,83 +218,83 @@ public class BoostVHTProcessor implements Processor {
   public void setEnsembleSize(int ensembleSize) {
     this.ensembleSize = ensembleSize;
   }
-  
+
   public Stream getControlStream() {
     return controlStream;
   }
-  
+
   public void setControlStream(Stream controlStream) {
     this.controlStream = controlStream;
   }
-  
+
   public Stream getAttributeStream() {
     return attributeStream;
   }
-  
+
   public void setAttributeStream(Stream attributeStreams) {
     this.attributeStream = attributeStreams;
   }
-  
-  public TopologyBuilder getBuilder() {
-    return builder;
-  }
-  
-  public void setBuilder(TopologyBuilder builder) {
-    this.builder = builder;
-  }
-  
-  public SplitCriterion getSplitCriterion() {
-    return splitCriterion;
-  }
-  
-  public void setSplitCriterion(SplitCriterion splitCriterion) {
-    this.splitCriterion = splitCriterion;
-  }
-  
-  public Double getSplitConfidence() {
-    return splitConfidence;
-  }
-  
-  public void setSplitConfidence(Double splitConfidence) {
-    this.splitConfidence = splitConfidence;
-  }
-  
-  public Double getTieThreshold() {
-    return tieThreshold;
-  }
-  
-  public void setTieThreshold(Double tieThreshold) {
-    this.tieThreshold = tieThreshold;
-  }
-  
-  public int getGracePeriod() {
-    return gracePeriod;
-  }
-  
-  public void setGracePeriod(int gracePeriod) {
-    this.gracePeriod = gracePeriod;
-  }
-  
-  public int getParallelismHint() {
-    return parallelismHint;
-  }
-  
-  public void setParallelismHint(int parallelismHint) {
-    this.parallelismHint = parallelismHint;
-  }
-  
-  public int getTimeOut() {
-    return timeOut;
-  }
-  
-  public void setTimeOut(int timeOut) {
-    this.timeOut = timeOut;
-  }
+//
+//  public TopologyBuilder getBuilder() {
+//    return builder;
+//  }
+//
+//  public void setBuilder(TopologyBuilder builder) {
+//    this.builder = builder;
+//  }
+//
+//  public SplitCriterion getSplitCriterion() {
+//    return splitCriterion;
+//  }
+//
+//  public void setSplitCriterion(SplitCriterion splitCriterion) {
+//    this.splitCriterion = splitCriterion;
+//  }
+//
+//  public Double getSplitConfidence() {
+//    return splitConfidence;
+//  }
+//
+//  public void setSplitConfidence(Double splitConfidence) {
+//    this.splitConfidence = splitConfidence;
+//  }
+//
+//  public Double getTieThreshold() {
+//    return tieThreshold;
+//  }
+//
+//  public void setTieThreshold(Double tieThreshold) {
+//    this.tieThreshold = tieThreshold;
+//  }
+//
+//  public int getGracePeriod() {
+//    return gracePeriod;
+//  }
+//
+//  public void setGracePeriod(int gracePeriod) {
+//    this.gracePeriod = gracePeriod;
+//  }
+//
+//  public int getParallelismHint() {
+//    return parallelismHint;
+//  }
+//
+//  public void setParallelismHint(int parallelismHint) {
+//    this.parallelismHint = parallelismHint;
+//  }
+//
+//  public int getTimeOut() {
+//    return timeOut;
+//  }
+//
+//  public void setTimeOut(int timeOut) {
+//    this.timeOut = timeOut;
+//  }
   
   @Override
   public Processor newProcessor(Processor sourceProcessor) {
-    BoostVHTProcessor newProcessor = new BoostVHTProcessor();
     BoostVHTProcessor originProcessor = (BoostVHTProcessor) sourceProcessor;
+    BoostVHTProcessor newProcessor = new BoostVHTProcessor.Builder(originProcessor).build();
     if (originProcessor.getResultStream() != null) {
       newProcessor.setResultStream(originProcessor.getResultStream());
     }
