@@ -130,12 +130,12 @@ public class BoostVHT implements ClassificationLearner, Configurable {
    */
   protected void setLayout() {
 
-    int sizeEnsemble = this.ensembleSizeOption.getValue();
+    int ensembleSize = this.ensembleSizeOption.getValue();
 
-    maP = new BoostVHTProcessor();
+    maP = new BoostVHTProcessor.Builder(dataset).setEnsembleSize(ensembleSize).build();
     
     //set parameters for Model Aggregators
-    maP.setEnsembleSize(sizeEnsemble);
+    maP.setEnsembleSize(ensembleSize);
     maP.setBuilder(this.builder);
     maP.setSplitCriterion((SplitCriterion)this.splitCriterionOption.getValue());
     maP.setSplitConfidence(this.splitConfidenceOption.getValue());
@@ -163,7 +163,7 @@ public class BoostVHT implements ClassificationLearner, Configurable {
             .numericClassObserver((AttributeClassObserver) this.numericEstimatorOption.getValue())
             .build();
     
-    this.builder.addProcessor(locStatProcessor,sizeEnsemble);
+    this.builder.addProcessor(locStatProcessor, ensembleSize);
   
     this.builder.connectInputKeyStream(attributeStream, locStatProcessor);
     this.builder.connectInputAllStream(controlStream, locStatProcessor);

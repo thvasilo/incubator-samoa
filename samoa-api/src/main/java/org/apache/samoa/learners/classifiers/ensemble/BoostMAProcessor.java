@@ -126,8 +126,25 @@ public final class BoostMAProcessor extends ModelAggregator implements Processor
     this.timeOut = builder.timeOut;
     this.boostProc = builder.boostProc;
 
+
     InstancesHeader ih = new InstancesHeader(dataset);
     this.setModelContext(ih);
+
+
+    // These used to happend in onCreate which no longer gets called.
+//    this.processorId = id;
+
+    this.activeLeafNodeCount = 0;
+    this.inactiveLeafNodeCount = 0;
+    this.decisionNodeCount = 0;
+    this.growthAllowed = true;
+
+    this.splittingNodes = new ConcurrentHashMap<>();
+    this.timedOutSplittingNodes = new LinkedBlockingQueue<>();
+    this.splitId = 0;
+
+    // Executor for scheduling time-out threads
+    this.executor = Executors.newScheduledThreadPool(8);
   }
 
   @Override
@@ -203,19 +220,7 @@ public final class BoostMAProcessor extends ModelAggregator implements Processor
 
   @Override
   public void onCreate(int id) {
-    this.processorId = id;
 
-    this.activeLeafNodeCount = 0;
-    this.inactiveLeafNodeCount = 0;
-    this.decisionNodeCount = 0;
-    this.growthAllowed = true;
-
-    this.splittingNodes = new ConcurrentHashMap<>();
-    this.timedOutSplittingNodes = new LinkedBlockingQueue<>();
-    this.splitId = 0;
-
-    // Executor for scheduling time-out threads
-    this.executor = Executors.newScheduledThreadPool(8);
   }
 
   @Override

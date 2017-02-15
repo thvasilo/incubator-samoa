@@ -97,6 +97,11 @@ public class BoostVHTProcessor implements Processor {
   //---for SAMME
   private int numOfClasses;
   //---
+
+  private BoostVHTProcessor(Builder builder) {
+    this.dataset = builder.dataset;
+  }
+
   /**
    * On event.
    * 
@@ -130,17 +135,20 @@ public class BoostVHTProcessor implements Processor {
   public void onCreate(int id) {
     
     mAPEnsemble = new BoostMAProcessor[ensembleSize];
+
+    this.scms = new double[ensembleSize];
+    this.swms = new double[ensembleSize];
     
     //----instantiate the MAs
     for (int i = 0; i < ensembleSize; i++) {
       //todo::  (Faye) what dataset should we pass in each MA that we instantiate? --> Ans: The same
       mAPEnsemble[i] = new BoostMAProcessor.Builder(dataset)
-              .splitCriterion(splitCriterion)
-              .splitConfidence(splitConfidence)
-              .tieThreshold(tieThreshold)
-              .gracePeriod(gracePeriod)
-              .parallelismHint(parallelismHint)
-              .timeOut(timeOut)
+//              .splitCriterion(splitCriterion)
+//              .splitConfidence(splitConfidence)
+//              .tieThreshold(tieThreshold)
+//              .gracePeriod(gracePeriod)
+//              .parallelismHint(parallelismHint)
+//              .timeOut(timeOut)
               .setBoostProcessor(this)
               .build();
     }
@@ -233,6 +241,30 @@ public class BoostVHTProcessor implements Processor {
             inEvent.getClassId(), combinedPrediction, inEvent.isLastEvent());
     rce.setEvaluationIndex(inEvent.getEvaluationIndex());
     return rce;
+  }
+
+  public static class Builder {
+    // required parameters
+    private final Instances dataset;
+
+    private int ensembleSize;
+
+    public Builder(Instances dataset) {
+      this.dataset = dataset;
+    }
+
+    public Builder(BoostVHTProcessor vhtProcessor) {
+      this.dataset = vhtProcessor.dataset;
+    }
+
+    public Builder setEnsembleSize(int ensembleSize) {
+      this.ensembleSize = ensembleSize;
+      return this;
+    }
+
+    public BoostVHTProcessor build() {
+      return new BoostVHTProcessor(this);
+    }
   }
   
   public Instances getInputInstances() {
@@ -341,8 +373,8 @@ public class BoostVHTProcessor implements Processor {
   
   @Override
   public Processor newProcessor(Processor sourceProcessor) {
-    BoostVHTProcessor newProcessor = new BoostVHTProcessor();
     BoostVHTProcessor originProcessor = (BoostVHTProcessor) sourceProcessor;
+    BoostVHTProcessor newProcessor = new BoostVHTProcessor.Builder(originProcessor).build();
     if (originProcessor.getResultStream() != null) {
       newProcessor.setResultStream(originProcessor.getResultStream());
     }
