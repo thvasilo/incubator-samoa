@@ -26,6 +26,7 @@ import org.apache.samoa.instances.Instance;
 import org.apache.samoa.instances.Instances;
 import org.apache.samoa.instances.InstancesHeader;
 import org.apache.samoa.learners.InstanceContent;
+import org.apache.samoa.learners.InstanceContentEvent;
 import org.apache.samoa.learners.InstancesContentEvent;
 import org.apache.samoa.learners.ResultContentEvent;
 import org.apache.samoa.learners.classifiers.ModelAggregator;
@@ -164,9 +165,9 @@ public final class BoostMAProcessor extends ModelAggregator implements Processor
     }
 
     // Receive a new instance from source
-    if (event instanceof InstancesContentEvent) {
-      InstancesContentEvent instancesEvent = (InstancesContentEvent) event;
-      this.processInstanceContentEvent(instancesEvent);
+    if (event instanceof InstanceContentEvent) {
+      InstanceContentEvent instanceEvent = (InstanceContentEvent) event;
+      this.processInstanceContentEvent(instanceEvent);
       // Send information to local-statistic PI
       // for each of the nodes
       if (this.foundNodeSet != null) {
@@ -274,54 +275,35 @@ public final class BoostMAProcessor extends ModelAggregator implements Processor
    * 
    * @param instContentEvent
    */
-  private void processInstanceContentEvent(InstancesContentEvent instContentEvent) {
-    this.numBatches++;
-    this.contentEventList.add(instContentEvent);
-    if (this.numBatches == 1 || this.numBatches > 4) {
-      this.processInstances(this.contentEventList.remove(0));
-    }
-
-    if (instContentEvent.isLastEvent()) {
-      // drain remaining instances
-      while (!contentEventList.isEmpty()) {
-        processInstances(contentEventList.remove(0));
-      }
-    }
-
-  }
-
-  private int numBatches = 0;
-
-  private void processInstances(InstancesContentEvent instContentEvent) {
-    for (InstanceContent instContent : instContentEvent.getList()) {
-      Instance inst = instContent.getInstance();
-      boolean isTesting = instContent.isTesting();
-      boolean isTraining = instContent.isTraining();
-      inst.setDataset(this.dataset);
-      // Check the instance whether it is used for testing or training
-      // boolean testAndTrain = isTraining; //Train after testing
-      double[] prediction = null;
-      if (isTesting) {
-        //todo(faye) no need to put any result in the stream (this would be a sub-result)
+  private void processInstanceContentEvent(InstanceContentEvent instContentEvent) {
+    Instance inst = instContentEvent.getInstance();
+    boolean isTesting = instContentEvent.isTesting();
+    boolean isTraining = instContentEvent.isTraining();
+    inst.setDataset(this.dataset);
+    // Check the instance whether it is used for testing or training
+    // boolean testAndTrain = isTraining; //Train after testing
+    double[] prediction = null;
+    if (isTesting) {
+      //todo(faye) no need to put any result in the stream (this would be a sub-result)
 //        prediction = getVotesForInstance(inst, false);
 //        this.boostProc.getResultStream().put(newResultContentEvent(prediction, instContent));
-      }
+    }
 
-      if (isTraining) {
-        trainOnInstanceImpl(inst);
-        if (this.changeDetector != null) {
-          if (prediction == null) {
-            prediction = getVotesForInstance(inst);
-          }
-          boolean correctlyClassifies = this.correctlyClassifies(inst, prediction);
-          double oldEstimation = this.changeDetector.getEstimation();
-          this.changeDetector.input(correctlyClassifies ? 0 : 1);
-          if (this.changeDetector.getEstimation() > oldEstimation) {
-            // Start a new classifier
-            logger.info("Change detected, resetting the classifier");
-            this.resetLearning();
-            this.changeDetector.resetLearning();
-          }
+    if (isTraining) {
+      // Does the actual training
+      trainOnInstanceImpl(inst);
+      if (this.changeDetector != null) {
+        if (prediction == null) {
+          prediction = getVotesForInstance(inst);
+        }
+        boolean correctlyClassifies = this.correctlyClassifies(inst, prediction);
+        double oldEstimation = this.changeDetector.getEstimation();
+        this.changeDetector.input(correctlyClassifies ? 0 : 1);
+        if (this.changeDetector.getEstimation() > oldEstimation) {
+          // Start a new classifier
+          logger.info("Change detected, resetting the classifier");
+          this.resetLearning();
+          this.changeDetector.resetLearning();
         }
       }
     }
