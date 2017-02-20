@@ -137,7 +137,10 @@ public class BoostVHTProcessor implements Processor {
         train(inEvent);
       }
     } else if (event instanceof LocalResultContentEvent) {
-
+      LocalResultContentEvent lrce = (LocalResultContentEvent) event;
+      for (int i = 0; i < ensembleSize; i++) {
+        mAPEnsemble[i].process(lrce);
+      }
     }
 
 
