@@ -97,9 +97,9 @@ public final class BoostMAProcessor extends ModelAggregator implements Processor
   private BlockingQueue<Long> timedOutSplittingNodes;
 
   // available streams
-//  private Stream resultStream;
-//  private Stream attributeStream;
-//  private Stream controlStream;
+  private Stream resultStream;
+  private Stream attributeStream;
+  private Stream controlStream;
 
   private transient ScheduledExecutorService executor;
 
@@ -119,6 +119,7 @@ public final class BoostMAProcessor extends ModelAggregator implements Processor
   // private constructor based on Builder pattern
   private BoostMAProcessor(Builder builder) {
     this.dataset = builder.dataset;
+    this.processorId = builder.processorID;
     this.splitCriterion = builder.splitCriterion;
     this.splitConfidence = builder.splitConfidence;
     this.tieThreshold = builder.tieThreshold;
@@ -130,10 +131,7 @@ public final class BoostMAProcessor extends ModelAggregator implements Processor
 
     InstancesHeader ih = new InstancesHeader(dataset);
     this.setModelContext(ih);
-
-
-    // These used to happend in onCreate which no longer gets called.
-//    this.processorId = id;
+    // These used to happen in onCreate which no longer gets called.
 
     this.activeLeafNodeCount = 0;
     this.inactiveLeafNodeCount = 0;
@@ -247,25 +245,25 @@ public final class BoostMAProcessor extends ModelAggregator implements Processor
     return sb.toString();
   }
 
-//  public void setResultStream(Stream resultStream) {
-//    this.resultStream = resultStream;
-//  }
-//
-//  public void setAttributeStream(Stream attributeStream) {
-//    this.attributeStream = attributeStream;
-//  }
-//
-//  public void setControlStream(Stream controlStream) {
-//    this.controlStream = controlStream;
-//  }
+  public void setResultStream(Stream resultStream) {
+    this.resultStream = resultStream;
+  }
+
+  public void setAttributeStream(Stream attributeStream) {
+    this.attributeStream = attributeStream;
+  }
+
+  public void setControlStream(Stream controlStream) {
+    this.controlStream = controlStream;
+  }
 
   //todo:: is there any reason to synchronize these two methods?
   void sendToAttributeStream(ContentEvent event) {
-    this.boostProc.getAttributeStream().put(event);
+    this.attributeStream.put(event);
   }
 
   public void sendToControlStream(ContentEvent event) {
-    this.boostProc.getControlStream().put(event);
+    this.controlStream.put(event);
   }
   
   private List<InstancesContentEvent> contentEventList = new LinkedList<>();
@@ -645,6 +643,7 @@ public final class BoostMAProcessor extends ModelAggregator implements Processor
 
     // required parameters
     private final Instances dataset;
+    private int processorID;
 
     // default values
     private SplitCriterion splitCriterion = new InfoGainSplitCriterion();
@@ -653,7 +652,6 @@ public final class BoostMAProcessor extends ModelAggregator implements Processor
     private int gracePeriod = 200;
     private int parallelismHint = 1;
     private long timeOut = 30;
-    private ChangeDetector changeDetector = null;
     private BoostVHTProcessor boostProc = null;
   
     public Builder(Instances dataset) {
@@ -662,6 +660,7 @@ public final class BoostMAProcessor extends ModelAggregator implements Processor
 
     public Builder(BoostMAProcessor oldProcessor) {
       this.dataset = oldProcessor.dataset;
+      this.processorID = oldProcessor.processorId;
       this.splitCriterion = oldProcessor.splitCriterion;
       this.splitConfidence = oldProcessor.splitConfidence;
       this.tieThreshold = oldProcessor.tieThreshold;
@@ -700,14 +699,14 @@ public final class BoostMAProcessor extends ModelAggregator implements Processor
       this.timeOut = timeOut;
       return this;
     }
-  
-    public Builder changeDetector(ChangeDetector changeDetector) {
-      this.changeDetector = changeDetector;
+    
+    public Builder boostProcessor(BoostVHTProcessor boostProc){
+      this.boostProc = boostProc;
       return this;
     }
-    
-    public Builder setBoostProcessor(BoostVHTProcessor boostProc){
-      this.boostProc = boostProc;
+
+    public Builder processorID(int processorID) {
+      this.processorID = processorID;
       return this;
     }
   

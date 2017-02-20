@@ -24,14 +24,14 @@ import org.apache.samoa.core.ContentEvent;
 import org.apache.samoa.core.Processor;
 import org.apache.samoa.instances.Instance;
 import org.apache.samoa.instances.Instances;
-import org.apache.samoa.learners.InstanceContent;
 import org.apache.samoa.learners.InstanceContentEvent;
 import org.apache.samoa.learners.ResultContentEvent;
+import org.apache.samoa.learners.classifiers.trees.LocalResultContentEvent;
+import org.apache.samoa.moa.classifiers.core.splitcriteria.InfoGainSplitCriterion;
 import org.apache.samoa.moa.classifiers.core.splitcriteria.SplitCriterion;
 import org.apache.samoa.moa.core.DoubleVector;
 import org.apache.samoa.moa.core.MiscUtils;
 import org.apache.samoa.topology.Stream;
-import org.apache.samoa.topology.TopologyBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,9 +60,7 @@ public class BoostVHTProcessor implements Processor {
   
   //------
   
-  /** The builder. */
-  private TopologyBuilder builder;
-  
+
   /** The input dataset to BoostVHT. */
   private Instances dataset;
   
@@ -95,11 +93,20 @@ public class BoostVHTProcessor implements Processor {
   
   
   //---for SAMME
-  private int numOfClasses;
+  private int numberOfClasses;
   //---
 
   private BoostVHTProcessor(Builder builder) {
     this.dataset = builder.dataset;
+    this.ensembleSize = builder.ensembleSize;
+
+    this.numberOfClasses = builder.numberOfClasses;
+    this.splitCriterion = builder.splitCriterion;
+    this.splitConfidence = builder.splitConfidence;
+    this.tieThreshold = builder.tieThreshold;
+    this.gracePeriod = builder.gracePeriod;
+    this.parallelismHint = builder.parallelismHint;
+    this.timeOut = builder.timeOut;
   }
 
   /**
@@ -109,8 +116,9 @@ public class BoostVHTProcessor implements Processor {
    * @return true, if successful
    */
   public boolean process(ContentEvent event) {
-   
-    InstanceContentEvent inEvent = (InstanceContentEvent) event;
+
+    if (event instanceof InstanceContentEvent) {
+      InstanceContentEvent inEvent = (InstanceContentEvent) event;
       //todo:: (Faye) check if any precondition is needed
 //    if (inEvent.getInstanceIndex() < 0) {
 //      end learning
@@ -118,16 +126,21 @@ public class BoostVHTProcessor implements Processor {
 //        stream.put(event);
 //      return false;
 //    }
-    
-    if (inEvent.isTesting()) {
-      double[] combinedPrediction = computeBoosting(inEvent);
-      this.resultStream.put(newResultContentEvent(combinedPrediction,inEvent));
+
+      if (inEvent.isTesting()) {
+        double[] combinedPrediction = computeBoosting(inEvent);
+        this.resultStream.put(newResultContentEvent(combinedPrediction,inEvent));
+      }
+
+      // estimate model parameters using the training data
+      if (inEvent.isTraining()) {
+        train(inEvent);
+      }
+    } else if (event instanceof LocalResultContentEvent) {
+
     }
 
-    // estimate model parameters using the training data
-    if (inEvent.isTraining()) {
-      train(inEvent);
-    }
+
     return true;
   }
 
@@ -141,16 +154,19 @@ public class BoostVHTProcessor implements Processor {
     
     //----instantiate the MAs
     for (int i = 0; i < ensembleSize; i++) {
-      //todo::  (Faye) what dataset should we pass in each MA that we instantiate? --> Ans: The same
-      mAPEnsemble[i] = new BoostMAProcessor.Builder(dataset)
-//              .splitCriterion(splitCriterion)
-//              .splitConfidence(splitConfidence)
-//              .tieThreshold(tieThreshold)
-//              .gracePeriod(gracePeriod)
-//              .parallelismHint(parallelismHint)
-//              .timeOut(timeOut)
-              .setBoostProcessor(this)
-              .build();
+      BoostMAProcessor newProc = new BoostMAProcessor.Builder(dataset)
+          .splitCriterion(splitCriterion)
+          .splitConfidence(splitConfidence)
+          .tieThreshold(tieThreshold)
+          .gracePeriod(gracePeriod)
+          .parallelismHint(parallelismHint)
+          .timeOut(timeOut)
+          .processorID(i) // The BoostMA processors get incremental ids
+          .boostProcessor(this) // TODO(tvas): Should prolly not be passing this, create better encapsulation
+          .build();
+      newProc.setAttributeStream(this.attributeStream);
+      newProc.setControlStream(this.controlStream);
+      mAPEnsemble[i] = newProc;
     }
     
   }
@@ -219,12 +235,12 @@ public class BoostVHTProcessor implements Processor {
   private double getEnsembleMemberWeight(int i) {
     double em = this.swms[i] / (this.scms[i] + this.swms[i]);
 //    if ((em == 0.0) || (em > 0.5)) {
-    if ((em == 0.0) || (em > (1.0 - 1.0/this.numOfClasses))) { //for SAMME
+    if ((em == 0.0) || (em > (1.0 - 1.0/this.numberOfClasses))) { //for SAMME
       return 0.0;
     }
     double Bm = em / (1.0 - em);
 //    return Math.log(1.0 / Bm);
-    return Math.log(1.0 / Bm ) + Math.log(this.numOfClasses - 1); //for SAMME
+    return Math.log(1.0 / Bm ) + Math.log(this.numberOfClasses - 1); //for SAMME
   }
   
   /**
@@ -244,21 +260,72 @@ public class BoostVHTProcessor implements Processor {
   }
 
   public static class Builder {
-    // required parameters
+    // BoostVHT processor parameters
     private final Instances dataset;
+    private int ensembleSize = 10;
+    private int numberOfClasses;
 
-    private int ensembleSize;
+    // BoostMAProcessor parameters
+    private SplitCriterion splitCriterion = new InfoGainSplitCriterion();
+    private double splitConfidence = 0.0000001;
+    private double tieThreshold = 0.05;
+    private int gracePeriod = 200;
+    private int parallelismHint = 1;
+    private int timeOut = 30;
 
     public Builder(Instances dataset) {
       this.dataset = dataset;
     }
 
-    public Builder(BoostVHTProcessor vhtProcessor) {
-      this.dataset = vhtProcessor.dataset;
+    public Builder(BoostVHTProcessor oldProcessor) {
+      this.dataset = oldProcessor.dataset;
+      this.ensembleSize = oldProcessor.ensembleSize;
+      this.numberOfClasses = oldProcessor.numberOfClasses;
+      this.splitCriterion = oldProcessor.splitCriterion;
+      this.splitConfidence = oldProcessor.splitConfidence;
+      this.tieThreshold = oldProcessor.tieThreshold;
+      this.gracePeriod = oldProcessor.gracePeriod;
+      this.parallelismHint = oldProcessor.parallelismHint;
+      this.timeOut = oldProcessor.timeOut;
     }
 
-    public Builder setEnsembleSize(int ensembleSize) {
+    public Builder ensembleSize(int ensembleSize) {
       this.ensembleSize = ensembleSize;
+      return this;
+    }
+
+    public Builder numberOfClasses(int numberOfClasses) {
+      this.numberOfClasses = numberOfClasses;
+      return this;
+    }
+
+    public Builder splitCriterion(SplitCriterion splitCriterion) {
+      this.splitCriterion = splitCriterion;
+      return this;
+    }
+
+    public Builder splitConfidence(double splitConfidence) {
+      this.splitConfidence = splitConfidence;
+      return this;
+    }
+
+    public Builder tieThreshold(double tieThreshold) {
+      this.tieThreshold = tieThreshold;
+      return this;
+    }
+
+    public Builder gracePeriod(int gracePeriod) {
+      this.gracePeriod = gracePeriod;
+      return this;
+    }
+
+    public Builder parallelismHint(int parallelismHint) {
+      this.parallelismHint = parallelismHint;
+      return this;
+    }
+
+    public Builder timeOut(int timeOut) {
+      this.timeOut = timeOut;
       return this;
     }
 
@@ -287,10 +354,6 @@ public class BoostVHTProcessor implements Processor {
     return ensembleSize;
   }
 
-  public void setEnsembleSize(int ensembleSize) {
-    this.ensembleSize = ensembleSize;
-  }
-  
   public Stream getControlStream() {
     return controlStream;
   }
@@ -298,63 +361,39 @@ public class BoostVHTProcessor implements Processor {
   public void setControlStream(Stream controlStream) {
     this.controlStream = controlStream;
   }
-  
+
   public Stream getAttributeStream() {
     return attributeStream;
   }
-  
-  public void setAttributeStream(Stream attributeStreams) {
-    this.attributeStream = attributeStreams;
+
+  public void setAttributeStream(Stream attributeStream) {
+    this.attributeStream = attributeStream;
   }
-  
-  public TopologyBuilder getBuilder() {
-    return builder;
-  }
-  
-  public void setBuilder(TopologyBuilder builder) {
-    this.builder = builder;
-  }
-  
+
   public SplitCriterion getSplitCriterion() {
     return splitCriterion;
   }
   
-  public void setSplitCriterion(SplitCriterion splitCriterion) {
-    this.splitCriterion = splitCriterion;
-  }
-  
+
   public Double getSplitConfidence() {
     return splitConfidence;
   }
   
-  public void setSplitConfidence(Double splitConfidence) {
-    this.splitConfidence = splitConfidence;
-  }
-  
+
   public Double getTieThreshold() {
     return tieThreshold;
   }
   
-  public void setTieThreshold(Double tieThreshold) {
-    this.tieThreshold = tieThreshold;
-  }
-  
+
   public int getGracePeriod() {
     return gracePeriod;
   }
   
-  public void setGracePeriod(int gracePeriod) {
-    this.gracePeriod = gracePeriod;
-  }
-  
+
   public int getParallelismHint() {
     return parallelismHint;
   }
-  
-  public void setParallelismHint(int parallelismHint) {
-    this.parallelismHint = parallelismHint;
-  }
-  
+
   public int getTimeOut() {
     return timeOut;
   }
@@ -363,27 +402,25 @@ public class BoostVHTProcessor implements Processor {
     this.timeOut = timeOut;
   }
   
-  public int getNumOfClasses() {
-    return numOfClasses;
+  public int getNumberOfClasses() {
+    return numberOfClasses;
   }
   
-  public void setNumOfClasses(int numOfClasses) {
-    this.numOfClasses = numOfClasses;
+  public void setNumberOfClasses(int numberOfClasses) {
+    this.numberOfClasses = numberOfClasses;
   }
   
   @Override
   public Processor newProcessor(Processor sourceProcessor) {
     BoostVHTProcessor originProcessor = (BoostVHTProcessor) sourceProcessor;
     BoostVHTProcessor newProcessor = new BoostVHTProcessor.Builder(originProcessor).build();
+    // TODO(tvas): Why are the streams handled separately from the rest of the options? Why not handle everything in the
+    // copy Builder?
     if (originProcessor.getResultStream() != null) {
       newProcessor.setResultStream(originProcessor.getResultStream());
+      newProcessor.setControlStream(originProcessor.getControlStream());
+      newProcessor.setAttributeStream(originProcessor.getAttributeStream());
     }
-    newProcessor.setEnsembleSize(originProcessor.getEnsembleSize());
-    /*
-     * if (originProcessor.getLearningCurve() != null){
-     * newProcessor.setLearningCurve((LearningCurve)
-     * originProcessor.getLearningCurve().copy()); }
-     */
     return newProcessor;
   }
 }

@@ -88,11 +88,7 @@ public class BoostVHT implements ClassificationLearner, Configurable {
   public FlagOption binarySplitsOption = new FlagOption("binarySplits", 'b',
           "Only allow binary splits.");
   
-  /** The base learner option. */
-  public ClassOption baseLearnerOption = new ClassOption("baseLearner", 'l',
-      "Classifier to train.", Learner.class, SingleClassifier.class.getName()); //TODO: maybe not needed
-
-  /** The ensemble size option. */
+    /** The ensemble size option. */
   public IntOption ensembleSizeOption = new IntOption("ensembleSize", 's',
       "The number of models in the bag.", 10, 1, Integer.MAX_VALUE);
 
@@ -132,29 +128,31 @@ public class BoostVHT implements ClassificationLearner, Configurable {
 
     int ensembleSize = this.ensembleSizeOption.getValue();
 
-    boostVHTProcessor = new BoostVHTProcessor.Builder(dataset).setEnsembleSize(ensembleSize).build();
-    
-    //set parameters for Model Aggregators (these are contained in the BoostVHTProcessor)
-    boostVHTProcessor.setEnsembleSize(ensembleSize);
-    boostVHTProcessor.setBuilder(this.builder);
-    // TODO(tvas): All these options should be handled in the Builder of the BoostVHTProcessor
-    boostVHTProcessor.setSplitCriterion((SplitCriterion)this.splitCriterionOption.getValue());
-    boostVHTProcessor.setSplitConfidence(this.splitConfidenceOption.getValue());
-    boostVHTProcessor.setTieThreshold(this.tieThresholdOption.getValue());
-    boostVHTProcessor.setGracePeriod(this.gracePeriodOption.getValue());
-    boostVHTProcessor.setParallelismHint(this.parallelismHintOption.getValue());
-    boostVHTProcessor.setTimeOut(this.timeOutOption.getValue());
-    boostVHTProcessor.setInputInstances(this.dataset);
-  
-    boostVHTProcessor.setNumOfClasses(this.numberOfClassesOption.getValue());
-    
+    // Set parameters for BoostVHT processor, and the BoostMA processors within.
+    try {
+      boostVHTProcessor = new BoostVHTProcessor.Builder(dataset)
+          .ensembleSize(this.ensembleSizeOption.getValue())
+          .numberOfClasses(this.numberOfClassesOption.getValue())
+          .splitCriterion(
+              (SplitCriterion) ClassOption.createObject(this.splitCriterionOption.getValueAsCLIString(),
+              this.splitCriterionOption.getRequiredType()))
+          .splitConfidence(this.splitConfidenceOption.getValue())
+          .tieThreshold(this.tieThresholdOption.getValue())
+          .gracePeriod(this.gracePeriodOption.getValue())
+          .parallelismHint(this.parallelismHintOption.getValue())
+          .timeOut(this.timeOutOption.getValue())
+          .build();
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+
     //add Boosting Model Aggregator Processor to the topology
-    this.builder.addProcessor(boostVHTProcessor, 1);
+    this.topologyBuilder.addProcessor(boostVHTProcessor, 1);
     
 
     // Streams
-    attributeStream = this.builder.createStream(boostVHTProcessor);
-    controlStream = this.builder.createStream(boostVHTProcessor);
+    attributeStream = this.topologyBuilder.createStream(boostVHTProcessor);
+    controlStream = this.topologyBuilder.createStream(boostVHTProcessor);
     
     //local statistics processor.
     locStatProcessor = new LocalStatisticsProcessor.Builder()
@@ -164,19 +162,19 @@ public class BoostVHT implements ClassificationLearner, Configurable {
             .numericClassObserver((AttributeClassObserver) this.numericEstimatorOption.getValue())
             .build();
     
-    this.builder.addProcessor(locStatProcessor, ensembleSize);
+    this.topologyBuilder.addProcessor(locStatProcessor, ensembleSize);
   
-    this.builder.connectInputKeyStream(attributeStream, locStatProcessor);
-    this.builder.connectInputAllStream(controlStream, locStatProcessor);
+    this.topologyBuilder.connectInputKeyStream(attributeStream, locStatProcessor);
+    this.topologyBuilder.connectInputAllStream(controlStream, locStatProcessor);
     
     
     //local statistics result stream
-    computeStream = this.builder.createStream(locStatProcessor);
+    computeStream = this.topologyBuilder.createStream(locStatProcessor);
     locStatProcessor.setComputationResultStream(computeStream);
-    this.builder.connectInputAllStream(computeStream, boostVHTProcessor);
+    this.topologyBuilder.connectInputAllStream(computeStream, boostVHTProcessor);
     
     
-    resultStream = this.builder.createStream(boostVHTProcessor);  //prediction is computed in boostVHTProcessor
+    resultStream = this.topologyBuilder.createStream(boostVHTProcessor);  //prediction is computed in boostVHTProcessor
     
     //set the out streams of the BoostVHTProcessor
     boostVHTProcessor.setResultStream(resultStream);
@@ -185,8 +183,8 @@ public class BoostVHT implements ClassificationLearner, Configurable {
 
   }
 
-  /** The builder. */
-  private TopologyBuilder builder;
+  /** The topologyBuilder. */
+  private TopologyBuilder topologyBuilder;
 
   /*
    * (non-Javadoc)
@@ -197,7 +195,7 @@ public class BoostVHT implements ClassificationLearner, Configurable {
 
   @Override
   public void init(TopologyBuilder builder, Instances dataset, int parallelism) {
-    this.builder = builder;
+    this.topologyBuilder = builder;
     this.dataset = dataset;
     this.parallelism = parallelism;
     this.setLayout();
