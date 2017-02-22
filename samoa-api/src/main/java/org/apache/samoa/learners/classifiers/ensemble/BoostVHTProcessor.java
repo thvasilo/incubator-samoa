@@ -206,10 +206,14 @@ public class BoostVHTProcessor implements Processor {
   protected void train(InstanceContentEvent inEvent) {
     Instance trainInstance = inEvent.getInstance();
     
+    //----debug comment
+//    System.out.println("Instance's weight: " + trainInstance.weight());
+    //----
     double lambda_d = 1.0; //set the example's weight
+    double e_m = 0.0;
     
     for (int i = 0; i < ensembleSize; i++) { //for each base model
-      int k = MiscUtils.poisson(1.0, this.random); //set k according to poisson
+      int k = MiscUtils.poisson(lambda_d, this.random); //set k according to poisson
       
       Instance weightedInstance = trainInstance.copy();
       if (k > 0) {
@@ -222,28 +226,42 @@ public class BoostVHTProcessor implements Processor {
       }
       //get prediction for the instance from the specific learner of the ensemble
       double[] prediction = mAPEnsemble[i].getVotesForInstance(trainInstance);
-      
+  
+      this.trainingWeightSeenByModel = this.mAPEnsemble[i].getWeightSeenByModel();
       //correctlyClassifies method of BoostMAProcessor
       if (mAPEnsemble[i].correctlyClassifies(trainInstance,prediction)) {
-        this.trainingWeightSeenByModel = this.mAPEnsemble[i].getWeightSeenByModel();
         this.scms[i] += lambda_d;
-        lambda_d *= this.trainingWeightSeenByModel / (2 * this.scms[i]);
+        e_m = this.swms[i] / (this.scms[i] + this.swms[i]) ;
+        lambda_d *=  1.0 / (2.0 * (1.0 - e_m)) ;
+        
+//        if (this.scms[i] == 0.0) {
+//          lambda_d = 0.0;
+//        } else
+//        lambda_d *= this.trainingWeightSeenByModel / (2 * this.scms[i]);
+//        }
       } else {
         this.swms[i] += lambda_d;
-        lambda_d *= this.trainingWeightSeenByModel / (2 * this.swms[i]);
+        e_m = this.swms[i] / (this.scms[i] + this.swms[i]) ;
+        lambda_d *=  1.0 / (2.0 * e_m) ;
+        
+//        if (this.swms[i] == 0.0) {
+//          lambda_d = 0.0;
+//        } else{
+//        lambda_d *= this.trainingWeightSeenByModel / (2 * this.swms[i]);
+//        }
       }
     }
   }
   
   private double getEnsembleMemberWeight(int i) {
     double em = this.swms[i] / (this.scms[i] + this.swms[i]);
-//    if ((em == 0.0) || (em > 0.5)) {
-    if ((em == 0.0) || (em > (1.0 - 1.0/this.numberOfClasses))) { //for SAMME
+    if ((em == 0.0) || (em > 0.5)) {
+//    if ((em == 0.0) || (em > (1.0 - 1.0/this.numberOfClasses))) { //for SAMME
       return 0.0;
     }
     double Bm = em / (1.0 - em);
-//    return Math.log(1.0 / Bm);
-    return Math.log(1.0 / Bm ) + Math.log(this.numberOfClasses - 1); //for SAMME
+    return Math.log(1.0 / Bm);
+//    return Math.log(1.0 / Bm ) + Math.log(this.numberOfClasses - 1); //for SAMME
   }
   
   /**

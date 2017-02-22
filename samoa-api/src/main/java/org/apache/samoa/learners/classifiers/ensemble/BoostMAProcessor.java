@@ -111,7 +111,7 @@ public final class BoostMAProcessor extends ModelAggregator implements Processor
   private final long timeOut;
   
   //
-  private double weightSeenByModel;
+  private double weightSeenByModel = 0.0;
   
   //the "parent" processor that boosting takes place. We need it for the streams
   private final BoostVHTProcessor boostProc;
