@@ -65,7 +65,7 @@ import org.slf4j.LoggerFactory;
  * @author Arinto Murdopo
  * 
  */
-public class ModelAggregatorProcessor extends ModelAggregator implements Processor {
+public class ModelAggregatorProcessor implements ModelAggregator, Processor {
 
   private static final long serialVersionUID = -1685875718300564886L;
   private static final Logger logger = LoggerFactory.getLogger(ModelAggregatorProcessor.class);
