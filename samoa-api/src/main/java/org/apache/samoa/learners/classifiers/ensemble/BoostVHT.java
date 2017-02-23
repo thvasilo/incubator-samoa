@@ -36,6 +36,7 @@ import org.apache.samoa.learners.ClassificationLearner;
 import org.apache.samoa.learners.Learner;
 import org.apache.samoa.learners.classifiers.SingleClassifier;
 import org.apache.samoa.learners.classifiers.trees.LocalStatisticsProcessor;
+import org.apache.samoa.learners.classifiers.trees.VerticalHoeffdingTree;
 import org.apache.samoa.moa.classifiers.core.attributeclassobservers.AttributeClassObserver;
 import org.apache.samoa.moa.classifiers.core.attributeclassobservers.DiscreteAttributeClassObserver;
 import org.apache.samoa.moa.classifiers.core.attributeclassobservers.NumericAttributeClassObserver;
@@ -51,7 +52,12 @@ import java.util.Set;
 public class BoostVHT implements ClassificationLearner, Configurable {
 
   /** The Constant serialVersionUID. */
-  private static final long serialVersionUID = -2971850264864952099L;
+  private static final long serialVersionUID = -7523211543185584536L;
+
+
+  /** The base learner option. */ //TODO(tvas): Not being used currently, adding it to ease the automated Python scripts
+  public ClassOption baseLearnerOption = new ClassOption("baseLearner", 'l',
+      "Classifier to train.", Learner.class, VerticalHoeffdingTree.class.getName());
   
   public ClassOption numericEstimatorOption = new ClassOption("numericEstimator",
           'n', "Numeric estimator to use.", NumericAttributeClassObserver.class,
@@ -77,13 +83,9 @@ public class BoostVHT implements ClassificationLearner, Configurable {
           "The number of instances a leaf should observe between split attempts.",
           200, 0, Integer.MAX_VALUE);
 
-  public IntOption parallelismHintOption = new IntOption("parallelismHint", 'p',
-          "The number of local statistics PI to do distributed computation",
-          1, 1, Integer.MAX_VALUE); //todo:: maybe not needed, if we do not have on PI per MA
-
   public IntOption timeOutOption = new IntOption("timeOut", 'o',
           "The duration to wait all distributed computation results from local statistics PI",
-          30, 1, Integer.MAX_VALUE);
+          Integer.MAX_VALUE, 1, Integer.MAX_VALUE);
 
   public FlagOption binarySplitsOption = new FlagOption("binarySplits", 'b',
           "Only allow binary splits.");
@@ -139,7 +141,7 @@ public class BoostVHT implements ClassificationLearner, Configurable {
           .splitConfidence(this.splitConfidenceOption.getValue())
           .tieThreshold(this.tieThresholdOption.getValue())
           .gracePeriod(this.gracePeriodOption.getValue())
-          .parallelismHint(this.parallelismHintOption.getValue())
+          .parallelismHint(this.ensembleSizeOption.getValue())
           .timeOut(this.timeOutOption.getValue())
           .build();
     } catch (Exception e) {

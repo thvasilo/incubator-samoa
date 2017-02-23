@@ -75,7 +75,7 @@ import static org.apache.samoa.moa.core.Utils.maxIndex;
  * @author Arinto Murdopo
  * 
  */
-public final class BoostMAProcessor extends ModelAggregator implements Processor {
+public final class BoostMAProcessor implements ModelAggregator, Processor {
 
   private static final long serialVersionUID = -1685875718300564886L;
   private static final Logger logger = LoggerFactory.getLogger(BoostMAProcessor.class);
