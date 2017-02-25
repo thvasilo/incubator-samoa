@@ -1,4 +1,4 @@
-package org.apache.samoa.moa.classifiers.trees;
+package org.apache.samoa.moa.classifiers.functions;
 
 /*
  * #%L
