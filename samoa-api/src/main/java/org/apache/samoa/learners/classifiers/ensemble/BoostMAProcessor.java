@@ -114,7 +114,6 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
   private double weightSeenByModel;
   
   //the "parent" processor that boosting takes place. We need it for the streams
-  private final BoostVHTProcessor boostProc;
 
   // private constructor based on Builder pattern
   private BoostMAProcessor(Builder builder) {
@@ -126,7 +125,6 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
     this.gracePeriod = builder.gracePeriod;
     this.parallelismHint = builder.parallelismHint;
     this.timeOut = builder.timeOut;
-    this.boostProc = builder.boostProc;
 
 
     InstancesHeader ih = new InstancesHeader(dataset);
@@ -652,8 +650,7 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
     private int gracePeriod = 200;
     private int parallelismHint = 1;
     private long timeOut = 30;
-    private BoostVHTProcessor boostProc = null;
-  
+
     public Builder(Instances dataset) {
       this.dataset = dataset;
     }
@@ -667,7 +664,6 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
       this.gracePeriod = oldProcessor.gracePeriod;
       this.parallelismHint = oldProcessor.parallelismHint;
       this.timeOut = oldProcessor.timeOut;
-      this.boostProc = oldProcessor.boostProc;
     }
   
     public Builder splitCriterion(SplitCriterion splitCriterion) {
@@ -700,11 +696,6 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
       return this;
     }
     
-    public Builder boostProcessor(BoostVHTProcessor boostProc){
-      this.boostProc = boostProc;
-      return this;
-    }
-
     public Builder processorID(int processorID) {
       this.processorID = processorID;
       return this;

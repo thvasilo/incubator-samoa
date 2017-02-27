@@ -169,7 +169,6 @@ public class BoostVHTProcessor implements Processor {
           .parallelismHint(parallelismHint)
           .timeOut(timeOut)
           .processorID(i) // The BoostMA processors get incremental ids
-          .boostProcessor(this) // TODO(tvas): Should prolly not be passing this, create better encapsulation
           .build();
       newProc.setAttributeStream(this.attributeStream);
       newProc.setControlStream(this.controlStream);
