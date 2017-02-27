@@ -22,6 +22,7 @@ package org.apache.samoa.moa.classifiers.trees;
 
 import com.github.javacliparser.FlagOption;
 import com.github.javacliparser.IntOption;
+import org.apache.samoa.learners.classifiers.ModelAggregator;
 import org.apache.samoa.moa.classifiers.AbstractClassifier;
 import org.apache.samoa.moa.classifiers.core.AttributeSplitSuggestion;
 import org.apache.samoa.moa.classifiers.core.attributeclassobservers.AttributeClassObserver;
@@ -48,7 +49,7 @@ import org.apache.samoa.instances.Instance;
  * @author Richard Kirkby (rkirkby@cs.waikato.ac.nz)
  * @version $Revision: 7 $
  */
-public class DecisionStump extends AbstractClassifier {
+public class DecisionStump extends AbstractClassifier implements ModelAggregator {
 
   private static final long serialVersionUID = 1L;
 

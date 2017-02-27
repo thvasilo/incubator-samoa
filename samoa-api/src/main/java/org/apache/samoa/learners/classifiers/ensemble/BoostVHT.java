@@ -41,6 +41,7 @@ import org.apache.samoa.moa.classifiers.core.attributeclassobservers.AttributeCl
 import org.apache.samoa.moa.classifiers.core.attributeclassobservers.DiscreteAttributeClassObserver;
 import org.apache.samoa.moa.classifiers.core.attributeclassobservers.NumericAttributeClassObserver;
 import org.apache.samoa.moa.classifiers.core.splitcriteria.SplitCriterion;
+import org.apache.samoa.moa.classifiers.functions.MajorityClass;
 import org.apache.samoa.topology.Stream;
 import org.apache.samoa.topology.TopologyBuilder;
 

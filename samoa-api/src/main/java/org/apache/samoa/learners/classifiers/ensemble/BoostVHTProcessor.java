@@ -26,9 +26,12 @@ import org.apache.samoa.instances.Instance;
 import org.apache.samoa.instances.Instances;
 import org.apache.samoa.learners.InstanceContentEvent;
 import org.apache.samoa.learners.ResultContentEvent;
+import org.apache.samoa.learners.classifiers.SimpleClassifierAdapter;
 import org.apache.samoa.learners.classifiers.trees.LocalResultContentEvent;
+import org.apache.samoa.moa.classifiers.Classifier;
 import org.apache.samoa.moa.classifiers.core.splitcriteria.InfoGainSplitCriterion;
 import org.apache.samoa.moa.classifiers.core.splitcriteria.SplitCriterion;
+import org.apache.samoa.moa.classifiers.trees.DecisionStump;
 import org.apache.samoa.moa.core.DoubleVector;
 import org.apache.samoa.moa.core.MiscUtils;
 import org.apache.samoa.topology.Stream;
@@ -36,6 +39,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Random;
+
+import static org.apache.samoa.moa.core.Utils.maxIndex;
 
 /**
  * The Class BoostVHTProcessor.
@@ -76,7 +81,9 @@ public class BoostVHTProcessor implements Processor {
   /** The attribute stream. */
   private Stream attributeStream;
   
-  protected BoostMAProcessor[] mAPEnsemble;
+  private BoostMAProcessor[] mAPEnsemble;
+
+  private org.apache.samoa.learners.classifiers.SimpleClassifierAdapter[] moaEnsemble;
 
   /** Ramdom number generator. */
   protected Random random = new Random(); //TODO make random seed configurable
@@ -154,10 +161,16 @@ public class BoostVHTProcessor implements Processor {
   public void onCreate(int id) {
     
     mAPEnsemble = new BoostMAProcessor[ensembleSize];
+    moaEnsemble = new SimpleClassifierAdapter[ensembleSize];
 
     this.scms = new double[ensembleSize];
     this.swms = new double[ensembleSize];
     this.e_m = new double[ensembleSize];
+
+    //Instantiate MOA learners
+    for (int i = 0; i < ensembleSize; i++) {
+      moaEnsemble[i] = new SimpleClassifierAdapter(new DecisionStump(), dataset);
+    }
     
     //----instantiate the MAs
     for (int i = 0; i < ensembleSize; i++) {
@@ -186,7 +199,7 @@ public class BoostVHTProcessor implements Processor {
     for (int i = 0; i < ensembleSize; i++) {
       double memberWeight = getEnsembleMemberWeight(i);
       if (memberWeight > 0.0) {
-        DoubleVector vote = new DoubleVector(mAPEnsemble[i].getVotesForInstance(testInstance));
+        DoubleVector vote = new DoubleVector(moaEnsemble[i].getVotesForInstance(testInstance));
         if (vote.sumOfValues() > 0.0) {
           vote.normalize();
           vote.scaleValues(memberWeight);
@@ -217,16 +230,16 @@ public class BoostVHTProcessor implements Processor {
       if (k > 0) {
         Instance weightedInstance = trainInstance.copy();
         weightedInstance.setWeight(trainInstance.weight() * k);
-        InstanceContentEvent instanceContentEvent = new InstanceContentEvent(inEvent.getInstanceIndex(), weightedInstance, true, false);
-        instanceContentEvent.setClassifierIndex(i);
-        instanceContentEvent.setEvaluationIndex(inEvent.getEvaluationIndex());
-        mAPEnsemble[i].process(instanceContentEvent);
+        InstanceContentEvent weightedContentEvent = new InstanceContentEvent(inEvent.getInstanceIndex(), weightedInstance, true, false);
+        weightedContentEvent.setClassifierIndex(i);
+        weightedContentEvent.setEvaluationIndex(inEvent.getEvaluationIndex());
+//        mAPEnsemble[i].process(weightedContentEvent);
+        moaEnsemble[i].trainOnInstance(weightedInstance);
       }
       //get prediction for the instance from the specific learner of the ensemble
-      double[] prediction = mAPEnsemble[i].getVotesForInstance(trainInstance);
-      
-      //correctlyClassifies method of BoostMAProcessor
-      if (mAPEnsemble[i].correctlyClassifies(trainInstance,prediction)) {
+      double[] prediction = moaEnsemble[i].getVotesForInstance(trainInstance);
+
+      if (correctlyClassifies(trainInstance, prediction)) {
         this.scms[i] += lambda_d;
         lambda_d *= this.trainingWeightSeenByModel / (2 * this.scms[i]);
       } else {
@@ -234,6 +247,10 @@ public class BoostVHTProcessor implements Processor {
         lambda_d *= this.trainingWeightSeenByModel / (2 * this.swms[i]);
       }
     }
+  }
+
+  boolean correctlyClassifies(Instance inst, double[] prediction) {
+    return maxIndex(prediction) == (int) inst.classValue();
   }
   
   private double getEnsembleMemberWeight(int i) {

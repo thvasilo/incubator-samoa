@@ -21,6 +21,7 @@ package org.apache.samoa.moa.classifiers.functions;
  */
 
 import org.apache.samoa.instances.Instance;
+import org.apache.samoa.learners.classifiers.ModelAggregator;
 import org.apache.samoa.moa.classifiers.AbstractClassifier;
 import org.apache.samoa.moa.core.DoubleVector;
 import org.apache.samoa.moa.core.Measurement;
@@ -32,7 +33,7 @@ import org.apache.samoa.moa.core.StringUtils;
  * @author Richard Kirkby (rkirkby@cs.waikato.ac.nz)
  * @version $Revision: 7 $
  */
-public class MajorityClass extends AbstractClassifier {
+public class MajorityClass extends AbstractClassifier implements ModelAggregator {
 
   private static final long serialVersionUID = 1L;
 
