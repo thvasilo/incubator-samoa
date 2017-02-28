@@ -376,4 +376,8 @@ public abstract class AbstractClassifier extends AbstractOptionHandler implement
   protected static int modelAttIndexToInstanceAttIndex(int index) {
     return index; // inst.classIndex() > index ? index : index + 1;
   }
+
+  protected static int modelAttIndexToInstanceAttIndex(int index, Instance inst) {
+    return inst.classIndex() > index ? index : index + 1;
+  }
 }
