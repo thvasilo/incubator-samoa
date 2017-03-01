@@ -21,35 +21,71 @@ package org.apache.samoa.learners.classifiers.ensemble;
 
 import org.apache.samoa.core.ContentEvent;
 import org.apache.samoa.core.Processor;
+import org.apache.samoa.instances.Instance;
 import org.apache.samoa.learners.InstanceContentEvent;
+import org.apache.samoa.learners.ResultContentEvent;
+import org.apache.samoa.learners.classifiers.LocalLearner;
 import org.apache.samoa.topology.Stream;
 
 public class BoostLocalProcessor implements Processor {
 
-  public BoostLocalProcessor(int processorId) {
-    this.processorId = processorId;
-  }
-
   private static final long serialVersionUID = -8744327519836673493L;
   private final int processorId;
-  Stream inputStream;
-  Stream outputStream;
+  private final int ensembleSize;
+
+  // This is the local learner instance that we will be training.
+  private LocalLearner localLearner;
+
+  private Stream outputStream;
+
+
+  public BoostLocalProcessor(int processorId, int ensembleSize, LocalLearner localLearner) {
+    this.processorId = processorId;
+    this.localLearner = localLearner;
+    this.ensembleSize = ensembleSize;
+  }
+
 
   @Override
   public boolean process(ContentEvent event) {
     System.out.println("id: " + processorId + " event: " + event);
+
+    InstanceContentEvent inEvent = (InstanceContentEvent) event;
+    Instance instance = inEvent.getInstance();
+
+    if (inEvent.getInstanceIndex() < 0) {
+      // end learning
+      ResultContentEvent outContentEvent = new ResultContentEvent(-1, instance, 0,
+          new double[0], inEvent.isLastEvent());
+      return false;
+    }
+
+    if (inEvent.isTesting()) {
+      double[] votes = localLearner.getVotesForInstance(instance);
+      ResultContentEvent outContentEvent = new ResultContentEvent(inEvent.getInstanceIndex(),
+          instance, inEvent.getClassId(), votes, inEvent.isLastEvent());
+    }
+
+    if (inEvent.isTraining()) {
+      localLearner.trainOnInstance(instance);
+    }
     outputStream.put(event);
     return true;
   }
 
   @Override
   public void onCreate(int id) {
+    localLearner.resetLearning();
   }
 
   @Override
   public Processor newProcessor(Processor oldProcessor) {
     BoostLocalProcessor oldLocalProcessor = (BoostLocalProcessor) oldProcessor;
-    BoostLocalProcessor newProcessor = new BoostLocalProcessor(oldLocalProcessor.getProcessorId());
+    BoostLocalProcessor newProcessor = new BoostLocalProcessor(
+        oldLocalProcessor.getProcessorId(),
+        oldLocalProcessor.getEnsembleSize(),
+        oldLocalProcessor.getLocalLearner());
+    newProcessor.getLocalLearner().resetLearning();
     newProcessor.setOutputStream(oldLocalProcessor.getOutputStream());
     return newProcessor;
   }
@@ -58,15 +94,19 @@ public class BoostLocalProcessor implements Processor {
     this.outputStream = outputStream;
   }
 
-  public Stream getInputStream() {
-    return inputStream;
-  }
-
   public Stream getOutputStream() {
     return outputStream;
   }
 
   public int getProcessorId() {
     return processorId;
+  }
+
+  public int getEnsembleSize() {
+    return ensembleSize;
+  }
+
+  public LocalLearner getLocalLearner() {
+    return localLearner;
   }
 }

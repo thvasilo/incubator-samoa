@@ -4,6 +4,8 @@ import com.google.common.collect.ImmutableSet;
 import org.apache.samoa.core.Processor;
 import org.apache.samoa.instances.Instances;
 import org.apache.samoa.learners.ClassificationLearner;
+import org.apache.samoa.learners.classifiers.SimpleClassifierAdapter;
+import org.apache.samoa.moa.classifiers.trees.HoeffdingTree;
 import org.apache.samoa.topology.Stream;
 import org.apache.samoa.topology.TopologyBuilder;
 
@@ -18,10 +20,6 @@ public class BoostLocal implements ClassificationLearner {
 
   private int ensembleSize = 3;
 
-  private Instances dataset;
-
-  private TopologyBuilder topologyBuilder;
-
   @Override
   public void init(TopologyBuilder topologyBuilder, Instances dataset, int parallelism) {
 
@@ -29,7 +27,9 @@ public class BoostLocal implements ClassificationLearner {
 
     // Instantiate learner processors, and add to topology
     for (int i = 0; i < ensembleSize; i++) {
-      BoostLocalProcessor boostLocalProcessor = new BoostLocalProcessor(i);
+      SimpleClassifierAdapter localLearner = new SimpleClassifierAdapter(new HoeffdingTree(), dataset);
+      // We add a local learner instance and the ensemble id to the local processor
+      BoostLocalProcessor boostLocalProcessor = new BoostLocalProcessor(i, ensembleSize, localLearner);
       topologyBuilder.addProcessor(boostLocalProcessor);
       localEnsemble[i] = boostLocalProcessor;
     }
