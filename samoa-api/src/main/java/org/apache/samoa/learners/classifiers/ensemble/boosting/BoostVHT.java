@@ -1,4 +1,4 @@
-package org.apache.samoa.learners.classifiers.ensemble;
+package org.apache.samoa.learners.classifiers.ensemble.boosting;
 
 /*
  * #%L
@@ -34,7 +34,6 @@ import org.apache.samoa.core.Processor;
 import org.apache.samoa.instances.Instances;
 import org.apache.samoa.learners.ClassificationLearner;
 import org.apache.samoa.learners.Learner;
-import org.apache.samoa.learners.classifiers.SingleClassifier;
 import org.apache.samoa.learners.classifiers.trees.LocalStatisticsProcessor;
 import org.apache.samoa.learners.classifiers.trees.VerticalHoeffdingTree;
 import org.apache.samoa.moa.classifiers.core.attributeclassobservers.AttributeClassObserver;

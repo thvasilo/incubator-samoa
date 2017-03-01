@@ -22,7 +22,7 @@ package org.apache.samoa.tasks;
 import com.github.javacliparser.ClassOption;
 import com.github.javacliparser.Configurable;
 import com.github.javacliparser.IntOption;
-import org.apache.samoa.learners.classifiers.ensemble.BoostLocal;
+import org.apache.samoa.learners.classifiers.ensemble.boosting.BoostLocal;
 import org.apache.samoa.streams.InstanceStream;
 import org.apache.samoa.streams.PrequentialSourceProcessor;
 import org.apache.samoa.streams.generators.RandomTreeGenerator;

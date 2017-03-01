@@ -1,4 +1,4 @@
-package org.apache.samoa.learners.classifiers.ensemble;
+package org.apache.samoa.learners.classifiers.ensemble.boosting;
 /*
  * #%L
  * SAMOA

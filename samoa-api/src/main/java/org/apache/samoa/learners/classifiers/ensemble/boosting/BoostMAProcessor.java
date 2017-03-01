@@ -1,4 +1,4 @@
-package org.apache.samoa.learners.classifiers.ensemble;
+package org.apache.samoa.learners.classifiers.ensemble.boosting;
 
 /*
  * #%L
@@ -25,10 +25,8 @@ import org.apache.samoa.core.Processor;
 import org.apache.samoa.instances.Instance;
 import org.apache.samoa.instances.Instances;
 import org.apache.samoa.instances.InstancesHeader;
-import org.apache.samoa.learners.InstanceContent;
 import org.apache.samoa.learners.InstanceContentEvent;
 import org.apache.samoa.learners.InstancesContentEvent;
-import org.apache.samoa.learners.ResultContentEvent;
 import org.apache.samoa.learners.classifiers.ModelAggregator;
 import org.apache.samoa.learners.classifiers.trees.ActiveLearningNode;
 import org.apache.samoa.learners.classifiers.trees.AttributeBatchContentEvent;
@@ -36,7 +34,6 @@ import org.apache.samoa.learners.classifiers.trees.FoundNode;
 import org.apache.samoa.learners.classifiers.trees.InactiveLearningNode;
 import org.apache.samoa.learners.classifiers.trees.LearningNode;
 import org.apache.samoa.learners.classifiers.trees.LocalResultContentEvent;
-import org.apache.samoa.learners.classifiers.trees.ModelAggregatorProcessor;
 import org.apache.samoa.learners.classifiers.trees.Node;
 import org.apache.samoa.learners.classifiers.trees.SplitNode;
 import org.apache.samoa.moa.classifiers.core.AttributeSplitSuggestion;
