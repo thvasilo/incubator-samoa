@@ -15,17 +15,19 @@ public class BoostLocal implements ClassificationLearner {
 
   private static final long serialVersionUID = -1853481790434442050L;
 
-  // The ensemble of learners, each wrapped in a processor
-  private BoostLocalProcessor[] localEnsemble;
-
-  private int ensembleSize = 3;
+  private BoostModelProcessor boostModelProcessor;
 
   @Override
   public void init(TopologyBuilder topologyBuilder, Instances dataset, int parallelism) {
 
-     localEnsemble = new BoostLocalProcessor[ensembleSize];
+    int ensembleSize = 3;
+    // Allocate an array for the local processors
+    BoostLocalProcessor[] localEnsemble = new BoostLocalProcessor[ensembleSize];
+    // Instantiate the model processor and add it to the topology
+    boostModelProcessor = new BoostModelProcessor(new ToyBoost());
+    topologyBuilder.addProcessor(boostModelProcessor);
 
-    // Instantiate learner processors, and add to topology
+    // Instantiate learner processors, and add them to the topology
     for (int i = 0; i < ensembleSize; i++) {
       SimpleClassifierAdapter localLearner = new SimpleClassifierAdapter(new HoeffdingTree(), dataset);
       // We add a local learner instance and the ensemble id to the local processor
@@ -34,29 +36,40 @@ public class BoostLocal implements ClassificationLearner {
       localEnsemble[i] = boostLocalProcessor;
     }
 
+    // Connect the model processor to the first learner
+    Stream learnerStream = topologyBuilder.createStream(boostModelProcessor);
+    topologyBuilder.connectInputShuffleStream(learnerStream, localEnsemble[0]);
+    boostModelProcessor.setLearnerStream(learnerStream);
+
     // These streams move events from learner to learner
     Stream[] ensembleStreams = new Stream[ensembleSize];
-
-    // Instantiate the output streams
+    // Instantiate the output streams for every learner
     for (int i = 0; i < ensembleSize; i++) {
       ensembleStreams[i] = topologyBuilder.createStream(localEnsemble[i]);
       localEnsemble[i].setOutputStream(ensembleStreams[i]);
     }
-
+    // Connect each learner to the next
     for (int i = 1; i < ensembleSize; i++) {
-      topologyBuilder.connectInputKeyStream(localEnsemble[i-1].getOutputStream(), localEnsemble[i]);
+      // Connect the output of the previous to the current learner
+      topologyBuilder.connectInputKeyStream(localEnsemble[i - 1].getOutputStream(), localEnsemble[i]);
     }
+    // Connect the last learner to the model processor, which handles the final output.
+    topologyBuilder.connectInputShuffleStream(localEnsemble[ensembleSize - 1].getOutputStream(), boostModelProcessor);
+
+    // Create the output stream from the model processor
+    Stream outputStream = topologyBuilder.createStream(boostModelProcessor);
+    boostModelProcessor.setOutputStream(outputStream);
   }
 
   @Override
   public Processor getInputProcessor() {
-    // Connect the first learner to the input data
-    return localEnsemble[0];
+    // Connect the model processor to the input data
+    return boostModelProcessor;
   }
 
   @Override
   public Set<Stream> getResultStreams() {
     // Have the output of the last learner as the output data
-    return ImmutableSet.of(localEnsemble[ensembleSize - 1].getOutputStream());
+    return ImmutableSet.of(boostModelProcessor.getOutputStream());
   }
 }

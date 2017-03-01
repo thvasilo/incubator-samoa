@@ -50,7 +50,9 @@ public class BoostLocalProcessor implements Processor {
   public boolean process(ContentEvent event) {
     System.out.println("id: " + processorId + " event: " + event);
 
-    InstanceContentEvent inEvent = (InstanceContentEvent) event;
+    BoostContentEvent boostContentEvent = (BoostContentEvent) event;
+    BoostingModel boostingModel = boostContentEvent.getBoostingModel();
+    InstanceContentEvent inEvent = boostContentEvent.getInstanceContentEvent();
     Instance instance = inEvent.getInstance();
 
     if (inEvent.getInstanceIndex() < 0) {
@@ -67,9 +69,9 @@ public class BoostLocalProcessor implements Processor {
     }
 
     if (inEvent.isTraining()) {
-      localLearner.trainOnInstance(instance);
+      boostingModel.updateWeak(inEvent.getInstanceContent(), localLearner);
     }
-    outputStream.put(event);
+    outputStream.put(new BoostContentEvent(inEvent, boostingModel));
     return true;
   }
 
