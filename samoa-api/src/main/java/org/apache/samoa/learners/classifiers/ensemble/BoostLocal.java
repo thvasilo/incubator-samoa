@@ -16,7 +16,7 @@ public class BoostLocal implements ClassificationLearner {
   // The ensemble of learners, each wrapped in a processor
   private BoostLocalProcessor[] localEnsemble;
 
-  private int ensembleSize = 2;
+  private int ensembleSize = 3;
 
   private Instances dataset;
 
@@ -37,10 +37,14 @@ public class BoostLocal implements ClassificationLearner {
     // These streams move events from learner to learner
     Stream[] ensembleStreams = new Stream[ensembleSize];
 
-    // Instantiate the streams, and connect each processor to the previous one
+    // Instantiate the output streams
+    for (int i = 0; i < ensembleSize; i++) {
+      ensembleStreams[i] = topologyBuilder.createStream(localEnsemble[i]);
+      localEnsemble[i].setOutputStream(ensembleStreams[i]);
+    }
+
     for (int i = 1; i < ensembleSize; i++) {
-      ensembleStreams[i] = topologyBuilder.createStream(localEnsemble[i - 1]);
-      topologyBuilder.connectInputAllStream(ensembleStreams[i], localEnsemble[i]);
+      topologyBuilder.connectInputKeyStream(localEnsemble[i-1].getOutputStream(), localEnsemble[i]);
     }
   }
 
@@ -53,6 +57,6 @@ public class BoostLocal implements ClassificationLearner {
   @Override
   public Set<Stream> getResultStreams() {
     // Have the output of the last learner as the output data
-    return ImmutableSet.of(localEnsemble[ensembleSize].getOutputStream());
+    return ImmutableSet.of(localEnsemble[ensembleSize - 1].getOutputStream());
   }
 }

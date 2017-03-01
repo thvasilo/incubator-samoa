@@ -26,7 +26,6 @@ import org.apache.samoa.learners.classifiers.ensemble.BoostLocal;
 import org.apache.samoa.streams.InstanceStream;
 import org.apache.samoa.streams.PrequentialSourceProcessor;
 import org.apache.samoa.streams.generators.RandomTreeGenerator;
-import org.apache.samoa.tasks.Task;
 import org.apache.samoa.topology.ComponentFactory;
 import org.apache.samoa.topology.Stream;
 import org.apache.samoa.topology.Topology;
@@ -39,11 +38,12 @@ public class MyTask implements Task, Configurable {
   /** The topology that will be created for the task */
   private Topology myTopology;
 
-  private ClassOption streamTrainOption = new ClassOption("trainStream", 's', "Stream to learn from.",
+  // Options need to be public so they are visible for the config
+  public ClassOption streamTrainOption = new ClassOption("trainStream", 's', "Stream to learn from.",
       InstanceStream.class, RandomTreeGenerator.class.getName());
 
-  private IntOption instanceLimitOption = new IntOption("instanceLimit", 'i',
-      "Maximum number of instances to test/train on  (-1 = no limit).", 50, -1,
+  public IntOption instanceLimitOption = new IntOption("instanceLimit", 'i',
+      "Maximum number of instances to test/train on  (-1 = no limit).", 10, -1,
       Integer.MAX_VALUE);
 
   @Override

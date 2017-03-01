@@ -31,26 +31,31 @@ public class BoostLocalProcessor implements Processor {
   }
 
   private static final long serialVersionUID = -8744327519836673493L;
-  private int processorId;
+  private final int processorId;
   Stream inputStream;
   Stream outputStream;
 
   @Override
   public boolean process(ContentEvent event) {
     System.out.println("id: " + processorId + " event: " + event);
+    outputStream.put(event);
     return true;
   }
 
   @Override
   public void onCreate(int id) {
-    processorId = id;
   }
 
   @Override
   public Processor newProcessor(Processor oldProcessor) {
     BoostLocalProcessor oldLocalProcessor = (BoostLocalProcessor) oldProcessor;
     BoostLocalProcessor newProcessor = new BoostLocalProcessor(oldLocalProcessor.getProcessorId());
+    newProcessor.setOutputStream(oldLocalProcessor.getOutputStream());
     return newProcessor;
+  }
+
+  public void setOutputStream(Stream outputStream) {
+    this.outputStream = outputStream;
   }
 
   public Stream getInputStream() {
