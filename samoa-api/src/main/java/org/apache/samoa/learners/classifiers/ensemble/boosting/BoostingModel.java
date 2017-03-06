@@ -37,8 +37,9 @@ public interface BoostingModel extends Serializable{
   /**
    * Outputs a prediction for the given instance.
    *
-   * Whether it suffices to just have the instance to make a prediction is debatable,
-   * will probably need the votes from all weak learners as well.
+   * TODO: Include aggregated predictions from all learners, this API doesn't work.
+   * Should only be called once votes from all predictors have been gathered for an instance.
+   * Should probably enforce this in code (take BoostContentEvent as input, maintain count there)
    * @param instance An instance content object, containing the features
    * @return An array of doubles, containing the prediction of the boosting model
    */
@@ -53,7 +54,7 @@ public interface BoostingModel extends Serializable{
   void update(InstanceContent trainInstance, double[] votes);
 
   /**
-   * Takes an instance and a reference to a weak learner and incrementally updates the boosting model.
+   * Takes an instance and a weak learner and incrementally updates the weak learner and boosting model.
    *
    * After studying the interfaces of the different boosting algorithms a bit more, it seems like we need
    * access to the weak learners at each step in order to properly update the model.

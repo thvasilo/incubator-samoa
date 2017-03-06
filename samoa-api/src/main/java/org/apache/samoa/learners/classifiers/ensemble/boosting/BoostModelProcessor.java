@@ -20,6 +20,7 @@ package org.apache.samoa.learners.classifiers.ensemble.boosting;
  */
 
 import org.apache.samoa.core.ContentEvent;
+import org.apache.samoa.core.DoubleVector;
 import org.apache.samoa.core.Processor;
 import org.apache.samoa.learners.InstanceContentEvent;
 import org.apache.samoa.topology.Stream;
@@ -36,18 +37,26 @@ import org.apache.samoa.topology.Stream;
 public class BoostModelProcessor implements Processor {
 
   private static final long serialVersionUID = -5393272885824859630L;
+  // The boosting model maintains the state of the boosting model we use
   private BoostingModel boostingModel;
+  // The learner stream connects this processor to the first learner in the boosting pipeline
   private Stream learnerStream;
+  // The output stream is the final output of the boosting model, taking the predictions from the boosting pipeline
+  // and propagating them down the line (e.g. to the evaluator)
   private Stream outputStream;
+  private int ensembleSize;
 
-  public BoostModelProcessor(BoostingModel boostingModel) {
+  public BoostModelProcessor(BoostingModel boostingModel, int ensembleSize) {
     this.boostingModel = boostingModel;
+    this.ensembleSize = ensembleSize;
   }
 
+  // Copy constructor. Note that these are all shallow copies
   private BoostModelProcessor(BoostModelProcessor oldProcessor) {
     this.boostingModel = oldProcessor.boostingModel;
     this.outputStream = oldProcessor.outputStream;
     this.learnerStream = oldProcessor.learnerStream;
+    this.ensembleSize = oldProcessor.ensembleSize;
   }
 
   @Override
@@ -57,17 +66,22 @@ public class BoostModelProcessor implements Processor {
    */
   public boolean process(ContentEvent event) {
 
-    if (event instanceof InstanceContentEvent) {
-      learnerStream.put(new BoostContentEvent((InstanceContentEvent) event, boostingModel));
+    if (event instanceof InstanceContentEvent) { // Receive an instance event from the source
+      // We augment the source event with the most up-to-date version of the model we have, and push it into the
+      // boosting pipeline
+      // TODO: Here is where we might have to stall until the model update comes in from the last instance event
+      learnerStream.put(new BoostContentEvent(
+          (InstanceContentEvent) event, boostingModel, new DoubleVector(new double[ensembleSize])));
     } else { // Then we must have an BoostContentEvent
       // So we update the model
-      // TODO: Does the model update happen here? Or is the model we receive already updated?
       BoostContentEvent boostContentEvent = (BoostContentEvent) event;
       this.boostingModel = boostContentEvent.getBoostingModel();
+      // And push the event to the output.
+      // TODO: Will need to create a ResultContentEvent here, based on the prediction of the boosting model.
       outputStream.put(boostContentEvent.getInstanceContentEvent());
     }
 
-    return false;
+    return false; // TODO: When should we return true and when false?
   }
 
   @Override
@@ -81,8 +95,7 @@ public class BoostModelProcessor implements Processor {
     return new BoostModelProcessor(oldModelProcessor);
   }
 
-
-
+  // TODO: Will need to verify whether these can be set in constructor instead of setter functions, making the streams final
   public void setLearnerStream(Stream learnerStream) {
     this.learnerStream = learnerStream;
   }

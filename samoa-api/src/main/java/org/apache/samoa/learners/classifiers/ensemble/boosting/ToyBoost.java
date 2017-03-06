@@ -39,6 +39,7 @@ public class ToyBoost implements BoostingModel {
   @Override
   public void updateWeak(InstanceContent trainInstance, LocalLearner weakLearner) {
     steps++;
+    weakLearner.trainOnInstance(trainInstance.getInstance());
     System.out.println("State of boosting model: " + steps);
   }
 }

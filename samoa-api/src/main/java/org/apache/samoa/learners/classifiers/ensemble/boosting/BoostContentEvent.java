@@ -21,21 +21,28 @@ package org.apache.samoa.learners.classifiers.ensemble.boosting;
  */
 
 import org.apache.samoa.core.ContentEvent;
+import org.apache.samoa.core.DoubleVector;
 import org.apache.samoa.learners.InstanceContentEvent;
 
-
+/**
+ * A BoostContentEvent is used to encapsulate an InstanceContentEvent, the state of the boosting model,
+ * and the current aggregate prediction. As the event moves down the boosting pipeline, the boosting model and
+ * the aggregate prediction are updated in place.
+ */
 final public class BoostContentEvent implements ContentEvent {
 
   private static final long serialVersionUID = -7355070269691265304L;
 
-  public BoostContentEvent(InstanceContentEvent instanceContentEvent, BoostingModel boostingModel) {
+  private final InstanceContentEvent instanceContentEvent;
+  private final BoostingModel boostingModel;
+  private final DoubleVector predictions;
+
+  public BoostContentEvent(
+      InstanceContentEvent instanceContentEvent, BoostingModel boostingModel, DoubleVector predictions) {
     this.instanceContentEvent = instanceContentEvent;
     this.boostingModel = boostingModel;
+    this.predictions = predictions;
   }
-  // These could be declared final and we do copies instead. Dunno which is better re. serialization.
-  private InstanceContentEvent instanceContentEvent;
-  private BoostingModel boostingModel;
-
   @Override
   public String getKey() {
     return instanceContentEvent.getKey();
@@ -59,11 +66,7 @@ final public class BoostContentEvent implements ContentEvent {
     return boostingModel;
   }
 
-  public void setInstanceContentEvent(InstanceContentEvent instanceContentEvent) {
-    this.instanceContentEvent = instanceContentEvent;
-  }
-
-  public void setBoostingModel(BoostingModel boostingModel) {
-    this.boostingModel = boostingModel;
+  public DoubleVector getPredictions() {
+    return predictions;
   }
 }

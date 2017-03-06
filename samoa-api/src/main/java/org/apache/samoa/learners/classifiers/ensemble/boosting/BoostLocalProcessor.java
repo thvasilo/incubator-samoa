@@ -27,6 +27,9 @@ import org.apache.samoa.learners.ResultContentEvent;
 import org.apache.samoa.learners.classifiers.LocalLearner;
 import org.apache.samoa.topology.Stream;
 
+/**
+ * Maintains the state of a local weak learner in the context of a boosting algorithm.
+ */
 public class BoostLocalProcessor implements Processor {
 
   private static final long serialVersionUID = -8744327519836673493L;
@@ -36,6 +39,7 @@ public class BoostLocalProcessor implements Processor {
   // This is the local learner instance that we will be training.
   private LocalLearner localLearner;
 
+  // The output stream is directed either at the next learner in the boosting pipeline, or the BoostModelProcessor
   private Stream outputStream;
 
 
@@ -46,6 +50,12 @@ public class BoostLocalProcessor implements Processor {
   }
 
 
+  /**
+   * Processes events of type {@link BoostContentEvent}, updating the weak learner, the boosting model, and making
+   * predictions.
+   * @param event A {@link BoostContentEvent} containing the boosting model and an {@link InstanceContentEvent}
+   * @return
+   */
   @Override
   public boolean process(ContentEvent event) {
     System.out.println("id: " + processorId + " event: " + event);
@@ -69,9 +79,12 @@ public class BoostLocalProcessor implements Processor {
     }
 
     if (inEvent.isTraining()) {
+      // Update the weak learner and the boosting model in-place.
       boostingModel.updateWeak(inEvent.getInstanceContent(), localLearner);
     }
-    outputStream.put(new BoostContentEvent(inEvent, boostingModel));
+
+    // No need to create new event, the event components (boostingModel, prediction) are modified in-place
+    outputStream.put(boostContentEvent);
     return true;
   }
 

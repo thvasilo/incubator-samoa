@@ -5,12 +5,33 @@ import org.apache.samoa.core.Processor;
 import org.apache.samoa.instances.Instances;
 import org.apache.samoa.learners.ClassificationLearner;
 import org.apache.samoa.learners.classifiers.SimpleClassifierAdapter;
+import org.apache.samoa.moa.classifiers.functions.MajorityClass;
 import org.apache.samoa.moa.classifiers.trees.HoeffdingTree;
 import org.apache.samoa.topology.Stream;
 import org.apache.samoa.topology.TopologyBuilder;
 
 import java.util.Set;
 
+/**
+ * BoostLocal is an implementation of boosting aimed at data parallelism.
+ *
+ * The topology that we use currently is this:
+ *
+ * The input data is fed into a {@link BoostModelProcessor} object, which augments it with the boosting
+ * model an passes it on to the learner ensemble.
+ * The learner ensemble is a number of {@link BoostLocalProcessor} objects, each holds the state of a weak learner
+ * that is trained locally. One output of {@link BoostModelProcessor} is connected to the first
+ * {@link BoostLocalProcessor} in the pipeline.
+ * The ensemble is connected in a pipeline manner, each learner connected to the next via a stream.
+ * The augmented instance (instance + boosting model) passes through each weak learner in sequence, updating its
+ * weak learner, and boosting model at each step, and at some point exits the pipeline.
+ * The instance is the returned to the {@link BoostLocalProcessor}, which updates its copy of the boosting model,
+ * and outputs the result that came from the last {@link BoostLocalProcessor} in the pipeline.
+ *
+ * As it stands now, the {@link BoostModelProcessor} continues sending in new data instances as they arrive, potentially
+ * attaching an "outdated" model to them, until the previous instance has passed through the pipeline and the boosting
+ * model is updated at the processor.
+ */
 public class BoostLocal implements ClassificationLearner {
 
   private static final long serialVersionUID = -1853481790434442050L;
@@ -24,14 +45,19 @@ public class BoostLocal implements ClassificationLearner {
     // Allocate an array for the local processors
     BoostLocalProcessor[] localEnsemble = new BoostLocalProcessor[ensembleSize];
     // Instantiate the model processor and add it to the topology
-    boostModelProcessor = new BoostModelProcessor(new ToyBoost());
+    boostModelProcessor = new BoostModelProcessor(new ToyBoost(), ensembleSize);
     topologyBuilder.addProcessor(boostModelProcessor);
 
     // Instantiate learner processors, and add them to the topology
     for (int i = 0; i < ensembleSize; i++) {
-      SimpleClassifierAdapter localLearner = new SimpleClassifierAdapter(new HoeffdingTree(), dataset);
+      // TODO: Question - Should I be instantiating the LocalLearner objects here, or do it in the constructor of
+      // of the BoostLocalProcessor? Given how Java handles objects, a reference to the localLearner object
+      // is passed to the constructor of BoostLocalProcessor. Does this get recreated through the newProcessor
+      // method of BoostLocalProcessor when the topology is instantiated?
+      SimpleClassifierAdapter localLearner = new SimpleClassifierAdapter(new MajorityClass(), dataset);
       // We add a local learner instance and the ensemble id to the local processor
       BoostLocalProcessor boostLocalProcessor = new BoostLocalProcessor(i, ensembleSize, localLearner);
+      // TODO: Does this way of creating the processors actually provide any parallelism?
       topologyBuilder.addProcessor(boostLocalProcessor);
       localEnsemble[i] = boostLocalProcessor;
     }
@@ -63,13 +89,13 @@ public class BoostLocal implements ClassificationLearner {
 
   @Override
   public Processor getInputProcessor() {
-    // Connect the model processor to the input data
+    // Connect the {@link BoostModelProcessor} to the input data
     return boostModelProcessor;
   }
 
   @Override
   public Set<Stream> getResultStreams() {
-    // Have the output of the last learner as the output data
+    // Have the output of the {@link BoostModelProcessor} as the learner output
     return ImmutableSet.of(boostModelProcessor.getOutputStream());
   }
 }

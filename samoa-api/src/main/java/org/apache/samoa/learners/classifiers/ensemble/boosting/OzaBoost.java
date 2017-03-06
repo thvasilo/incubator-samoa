@@ -30,12 +30,15 @@ import java.util.Random;
 import static org.apache.samoa.instances.Utils.maxIndex;
 
 /**
- * The basic OzaBoost algorithm, from the continuation paper.
+ * The OzaBoost algorithm, as shown in the continuation paper [1].
+ *
+ * [1] Oza, Nikunj C. "Online bagging and boosting." Systems, man and cybernetics, 2005 IEEE International
+ * conference on. Vol. 3. IEEE, 2005.
  */
 public class OzaBoost implements BoostingModel {
   private static final long serialVersionUID = -4360335604627806863L;
   private static final Random random = new Random();
-  final private int ensembleSize;
+  private final int ensembleSize;
   private double[] lambda_wrong;
   private double[] lambda_correct;
   private double[] epsilon;
