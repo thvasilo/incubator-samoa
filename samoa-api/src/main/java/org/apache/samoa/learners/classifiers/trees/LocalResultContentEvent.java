@@ -37,6 +37,8 @@ public final class LocalResultContentEvent implements ContentEvent {
   private final AttributeSplitSuggestion bestSuggestion;
   private final AttributeSplitSuggestion secondBestSuggestion;
   private final long splitId;
+  
+  private int ensembleId;//faye boostVHT
 
   public LocalResultContentEvent() {
     bestSuggestion = null;
@@ -91,5 +93,14 @@ public final class LocalResultContentEvent implements ContentEvent {
   @Override
   public boolean isLastEvent() {
     return false;
+  }
+  
+  //-------//faye boostVHT
+  public int getEnsembleId() {
+    return ensembleId;
+  }
+  
+  public void setEnsembleId(int ensembleId) {
+    this.ensembleId = ensembleId;
   }
 }

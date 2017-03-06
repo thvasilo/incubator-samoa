@@ -93,7 +93,8 @@ public class BoostVHTProcessor implements Processor {
   
   protected double trainingWeightSeenByModel; //todo:: (Faye) when is this updated?
   //-----
-  
+//  private long numberOfMessages = 0;
+//  private long[] nOfMsgPerEnseble ;
   
   //---for SAMME
   private int numberOfClasses;
@@ -140,9 +141,15 @@ public class BoostVHTProcessor implements Processor {
         train(inEvent);
       }
     } else if (event instanceof LocalResultContentEvent) {
+//      numberOfMessages++;
+//      System.out.println("---------numberOfMessages: " + numberOfMessages);
       LocalResultContentEvent lrce = (LocalResultContentEvent) event;
       for (int i = 0; i < ensembleSize; i++) {
-        mAPEnsemble[i].process(lrce);
+        if (lrce.getEnsembleId() == mAPEnsemble[i].getProcessorId()){
+//          nOfMsgPerEnseble[i]++;
+//          System.out.println("-.-.-.-ensemble: " + i+ ",-.- nOfMsgPerEnseble: " + nOfMsgPerEnseble[i]);
+          mAPEnsemble[i].process(lrce);
+        }
       }
     }
 
@@ -158,6 +165,8 @@ public class BoostVHTProcessor implements Processor {
     this.scms = new double[ensembleSize];
     this.swms = new double[ensembleSize];
     this.e_m = new double[ensembleSize];
+    
+//    this.nOfMsgPerEnseble = new long[ensembleSize];
     
     //----instantiate the MAs
     for (int i = 0; i < ensembleSize; i++) {

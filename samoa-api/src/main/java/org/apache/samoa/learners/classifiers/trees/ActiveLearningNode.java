@@ -48,13 +48,15 @@ public final class ActiveLearningNode extends LearningNode {
   private final int parallelismHint;
   private int suggestionCtr;
   private int thrownAwayInstance;
+  
+  private int ensembleId; //faye boostVHT
 
   private boolean isSplitting;
 
   public ActiveLearningNode(double[] classObservation, int parallelismHint) {
     super(classObservation);
     this.weightSeenAtLastSplitEvaluation = this.getWeightSeen();
-    this.id = VerticalHoeffdingTree.LearningNodeIdGenerator.generate();
+    this.id = VerticalHoeffdingTree.LearningNodeIdGenerator.generate(); //todo (faye) :: ask if this could affect the singleton property.
     this.attributeContentEventKeys = new HashMap<>();
     this.isSplitting = false;
     this.parallelismHint = parallelismHint;
@@ -149,6 +151,7 @@ public final class ActiveLearningNode extends LearningNode {
       ModelAggregatorProcessor map = (ModelAggregatorProcessor)modelAggrProc;
       map.sendToControlStream(cce);
     } else if(modelAggrProc instanceof BoostMAProcessor) {
+      cce.setEnsembleId(this.ensembleId); //faye boostVHT
       BoostMAProcessor map = (BoostMAProcessor)modelAggrProc;
       map.sendToControlStream(cce);
     }
@@ -212,5 +215,14 @@ public final class ActiveLearningNode extends LearningNode {
     result = prime * result + (int) (this.id ^ (this.id >>> 32));
     result = prime * result + obsIndex;
     return Integer.toString(result);
+  }
+  
+  //-----------------faye boostVHT
+  public int getEnsembleId() {
+    return ensembleId;
+  }
+  
+  public void setEnsembleId(int ensembleId) {
+    this.ensembleId = ensembleId;
   }
 }

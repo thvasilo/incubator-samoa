@@ -150,6 +150,7 @@ public final class LocalStatisticsProcessor implements Processor {
       // create the local result content event
       LocalResultContentEvent lcre =
           new LocalResultContentEvent(cce.getSplitId(), bestSuggestion, secondBestSuggestion);
+      lcre.setEnsembleId(cce.getEnsembleId()); //faye boostVHT
       computationResultStream.put(lcre);
       logger.debug("Finish compute event");
     } else if (event instanceof DeleteContentEvent) {

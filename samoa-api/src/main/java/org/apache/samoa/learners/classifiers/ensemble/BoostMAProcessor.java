@@ -202,7 +202,7 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
         // activeLearningNode has been
         // removed by timeout thread
         ActiveLearningNode activeLearningNode = splittingNodeInfo.activeLearningNode;
-
+        
         activeLearningNode.addDistributedSuggestions(lrce.getBestSuggestion(), lrce.getSecondBestSuggestion());
 
         if (activeLearningNode.isAllSuggestionsCollected()) {
@@ -551,7 +551,9 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
   private LearningNode newLearningNode(double[] initialClassObservations, int parallelismHint) {
     // for VHT optimization, we need to dynamically instantiate the appropriate
     // ActiveLearningNode
-    return new ActiveLearningNode(initialClassObservations, parallelismHint);
+    ActiveLearningNode newNode = new ActiveLearningNode(initialClassObservations, parallelismHint);
+    newNode.setEnsembleId(this.processorId);
+    return newNode;
   }
 
   /**
@@ -721,4 +723,7 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
     return weightSeenByModel;
   }
   
+  public int getProcessorId() {
+    return processorId;
+  }
 }
