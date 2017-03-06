@@ -22,13 +22,28 @@ package org.apache.samoa.learners.classifiers.ensemble.boosting;
 import org.apache.samoa.core.ContentEvent;
 import org.apache.samoa.core.Processor;
 import org.apache.samoa.instances.Instance;
+import org.apache.samoa.learners.InstanceContent;
 import org.apache.samoa.learners.InstanceContentEvent;
 import org.apache.samoa.learners.ResultContentEvent;
 import org.apache.samoa.learners.classifiers.LocalLearner;
+import org.apache.samoa.moa.core.DoubleVector;
 import org.apache.samoa.topology.Stream;
 
 /**
  * Maintains the state of a local weak learner in the context of a boosting algorithm.
+ *
+ * Note that the state/prediction of the boosting algorithm is split into parts, and lives in different classes,
+ * which is not ideal:
+ * From what I've been able to to decipher from the various boosting algos, the prediction always relies on a sum of the
+ * weak learner predictions, with different ways to calculate the weight of each weak learner.
+ * To achieve that we have delegated the weighting of the prediction to {@link BoostingModel} through the function
+ * weighPredictions, which takes the raw predictions of the weak learner and applies proper weighting.
+ * In OzaBoost for example this includes the normalization of the values.
+ * The summing of the votes and updating the running sum is however the responsibility of {@link BoostLocalProcessor},
+ * as the sum lives in the {@link BoostContentEvent} message, and right now is not affected by the {@link BoostingModel}
+ * This API could change though, for example we could pass the running sum to the weighPredictions function as well.
+ * It's a matter of preference I guess. It would move the responsibility of summing to model from this processor.
+ *
  */
 public class BoostLocalProcessor implements Processor {
 
@@ -58,12 +73,20 @@ public class BoostLocalProcessor implements Processor {
    */
   @Override
   public boolean process(ContentEvent event) {
-    System.out.println("id: " + processorId + " event: " + event);
+//    System.out.println("id: " + processorId + " event: " + event);
 
+    // Cast and unpack event
     BoostContentEvent boostContentEvent = (BoostContentEvent) event;
-    BoostingModel boostingModel = boostContentEvent.getBoostingModel();
+    BoostingModel boostingModel = boostContentEvent.getBoostingModel().createCopy();
     InstanceContentEvent inEvent = boostContentEvent.getInstanceContentEvent();
-    Instance instance = inEvent.getInstance();
+    InstanceContent instanceContent = inEvent.getInstanceContent();
+    InstanceContent newInstanceContent = new InstanceContent(instanceContent.getInstanceIndex(),
+        instanceContent.getInstance(), instanceContent.isTraining(), instanceContent.isTesting());
+    Instance instance = newInstanceContent.getInstance();
+    DoubleVector predictionsSum = new DoubleVector(boostContentEvent.getPredictionSum());
+
+    // Update the instance's classifier index
+    inEvent.setClassifierIndex(processorId);
 
     if (inEvent.getInstanceIndex() < 0) {
       // end learning
@@ -73,18 +96,21 @@ public class BoostLocalProcessor implements Processor {
     }
 
     if (inEvent.isTesting()) {
+      // Make the weak learner prediction, weight it according to the boosting model, and add it to the running sum
       double[] votes = localLearner.getVotesForInstance(instance);
-      ResultContentEvent outContentEvent = new ResultContentEvent(inEvent.getInstanceIndex(),
-          instance, inEvent.getClassId(), votes, inEvent.isLastEvent());
+      // Scale the votes according to the weak classifier's weight
+      boostingModel.weighPredictions(processorId, new DoubleVector(votes));
+      // Add the scaled votes to the running sum of class predictions
+      predictionsSum.addValues(votes);
     }
 
     if (inEvent.isTraining()) {
       // Update the weak learner and the boosting model in-place.
-      boostingModel.updateWeak(inEvent.getInstanceContent(), localLearner);
+      boostingModel.updateModelAndWeak(newInstanceContent, localLearner);
     }
 
-    // No need to create new event, the event components (boostingModel, prediction) are modified in-place
-    outputStream.put(boostContentEvent);
+    // No need to create new event, all the event components are modified in-place
+    outputStream.put(new BoostContentEvent(inEvent, boostingModel, predictionsSum));
     return true;
   }
 

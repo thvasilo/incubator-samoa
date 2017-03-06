@@ -19,6 +19,7 @@ package org.apache.samoa.learners.classifiers.ensemble.boosting;
  * #L%
  */
 
+import org.apache.samoa.moa.core.DoubleVector;
 import org.apache.samoa.learners.InstanceContent;
 import org.apache.samoa.learners.classifiers.LocalLearner;
 
@@ -27,8 +28,22 @@ public class ToyBoost implements BoostingModel {
   private int steps = 0;
 
   @Override
-  public double[] predict(InstanceContent instance) {
+  public BoostingModel createCopy() {
+    ToyBoost copy = new ToyBoost();
+    copy.steps = this.steps;
+    copy.super_steps = this.super_steps;
+    return copy;
+  }
+
+  @Override
+  public double[] predict(InstanceContent instance, DoubleVector weakPredictionsSum) {
     return new double[0];
+  }
+
+  @Override
+  public void weighPredictions(int learnerID, DoubleVector weakPredictions) {
+    System.out.println("id: " + learnerID + " weakPrediction: " + weakPredictions);
+    weakPredictions.scaleValues(learnerID + 1);
   }
 
   @Override
@@ -37,7 +52,7 @@ public class ToyBoost implements BoostingModel {
   }
 
   @Override
-  public void updateWeak(InstanceContent trainInstance, LocalLearner weakLearner) {
+  public void updateModelAndWeak(InstanceContent trainInstance, LocalLearner weakLearner) {
     steps++;
     weakLearner.trainOnInstance(trainInstance.getInstance());
     System.out.println("State of boosting model: " + steps);

@@ -19,6 +19,7 @@ package org.apache.samoa.learners.classifiers.ensemble.boosting;
  * #L%
  */
 
+import org.apache.samoa.moa.core.DoubleVector;
 import org.apache.samoa.learners.InstanceContent;
 import org.apache.samoa.learners.classifiers.LocalLearner;
 
@@ -35,15 +36,22 @@ import java.io.Serializable;
  */
 public interface BoostingModel extends Serializable{
   /**
-   * Outputs a prediction for the given instance.
+   * Outputs a boosting prediction for the given instance and sum of  weak learner predictions.
    *
-   * TODO: Include aggregated predictions from all learners, this API doesn't work.
    * Should only be called once votes from all predictors have been gathered for an instance.
    * Should probably enforce this in code (take BoostContentEvent as input, maintain count there)
    * @param instance An instance content object, containing the features
+   * @param weakPredictionsSum A vector of weak learner predictions that gets aggregated over the boosting pipeline
    * @return An array of doubles, containing the prediction of the boosting model
    */
-  double[] predict(InstanceContent instance);
+  double[] predict(InstanceContent instance, DoubleVector weakPredictionsSum);
+
+  /**
+   * Adjusts the weight of the prediction vector for a weak learner in place
+   * @param learnerID The id of the weak learner in the ensemble
+   * @param weakPredictions A vector of predictions produced by the weak learner
+   */
+  void weighPredictions(int learnerID, DoubleVector weakPredictions);
 
   /**
    * Given the votes of every weak learner for an instance, and the instance itself, update
@@ -62,5 +70,11 @@ public interface BoostingModel extends Serializable{
    * @param trainInstance A instance containing the features and true dependent
    * @param weakLearner A reference to the weak learner used for the current iteration of boosting.
    */
-  void updateWeak(InstanceContent trainInstance, LocalLearner weakLearner);
+  void updateModelAndWeak(InstanceContent trainInstance, LocalLearner weakLearner);
+
+  /**
+   * Creates a deep copy of the model and returns it
+   * @return A deep copy of the boosting model
+   */
+  BoostingModel createCopy();
 }

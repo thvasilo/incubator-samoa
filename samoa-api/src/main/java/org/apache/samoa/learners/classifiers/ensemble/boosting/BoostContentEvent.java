@@ -21,7 +21,7 @@ package org.apache.samoa.learners.classifiers.ensemble.boosting;
  */
 
 import org.apache.samoa.core.ContentEvent;
-import org.apache.samoa.core.DoubleVector;
+import org.apache.samoa.moa.core.DoubleVector;
 import org.apache.samoa.learners.InstanceContentEvent;
 
 /**
@@ -35,13 +35,13 @@ final public class BoostContentEvent implements ContentEvent {
 
   private final InstanceContentEvent instanceContentEvent;
   private final BoostingModel boostingModel;
-  private final DoubleVector predictions;
+  private final DoubleVector predictionSum;
 
   public BoostContentEvent(
-      InstanceContentEvent instanceContentEvent, BoostingModel boostingModel, DoubleVector predictions) {
+      InstanceContentEvent instanceContentEvent, BoostingModel boostingModel, DoubleVector predictionSum) {
     this.instanceContentEvent = instanceContentEvent;
     this.boostingModel = boostingModel;
-    this.predictions = predictions;
+    this.predictionSum = predictionSum;
   }
   @Override
   public String getKey() {
@@ -66,7 +66,7 @@ final public class BoostContentEvent implements ContentEvent {
     return boostingModel;
   }
 
-  public DoubleVector getPredictions() {
-    return predictions;
+  public DoubleVector getPredictionSum() {
+    return predictionSum;
   }
 }

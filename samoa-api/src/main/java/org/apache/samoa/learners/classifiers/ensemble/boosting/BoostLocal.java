@@ -6,6 +6,7 @@ import org.apache.samoa.instances.Instances;
 import org.apache.samoa.learners.ClassificationLearner;
 import org.apache.samoa.learners.classifiers.SimpleClassifierAdapter;
 import org.apache.samoa.moa.classifiers.functions.MajorityClass;
+import org.apache.samoa.moa.classifiers.trees.DecisionStump;
 import org.apache.samoa.moa.classifiers.trees.HoeffdingTree;
 import org.apache.samoa.topology.Stream;
 import org.apache.samoa.topology.TopologyBuilder;
@@ -41,11 +42,11 @@ public class BoostLocal implements ClassificationLearner {
   @Override
   public void init(TopologyBuilder topologyBuilder, Instances dataset, int parallelism) {
 
-    int ensembleSize = 3;
+    final int ensembleSize = 5;
     // Allocate an array for the local processors
     BoostLocalProcessor[] localEnsemble = new BoostLocalProcessor[ensembleSize];
     // Instantiate the model processor and add it to the topology
-    boostModelProcessor = new BoostModelProcessor(new ToyBoost(), ensembleSize);
+    boostModelProcessor = new BoostModelProcessor(new OzaBoost(ensembleSize), ensembleSize);
     topologyBuilder.addProcessor(boostModelProcessor);
 
     // Instantiate learner processors, and add them to the topology
@@ -54,7 +55,7 @@ public class BoostLocal implements ClassificationLearner {
       // of the BoostLocalProcessor? Given how Java handles objects, a reference to the localLearner object
       // is passed to the constructor of BoostLocalProcessor. Does this get recreated through the newProcessor
       // method of BoostLocalProcessor when the topology is instantiated?
-      SimpleClassifierAdapter localLearner = new SimpleClassifierAdapter(new MajorityClass(), dataset);
+      SimpleClassifierAdapter localLearner = new SimpleClassifierAdapter(new DecisionStump(), dataset);
       // We add a local learner instance and the ensemble id to the local processor
       BoostLocalProcessor boostLocalProcessor = new BoostLocalProcessor(i, ensembleSize, localLearner);
       // TODO: Does this way of creating the processors actually provide any parallelism?

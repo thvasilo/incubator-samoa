@@ -19,9 +19,9 @@ package org.apache.samoa.learners.classifiers.ensemble.boosting;
  * #L%
  */
 
+import org.apache.samoa.moa.core.DoubleVector;
 import org.apache.samoa.instances.Instance;
 import org.apache.samoa.learners.InstanceContent;
-import org.apache.samoa.learners.InstanceContentEvent;
 import org.apache.samoa.learners.classifiers.LocalLearner;
 import org.apache.samoa.moa.core.MiscUtils;
 
@@ -53,8 +53,33 @@ public class OzaBoost implements BoostingModel {
   }
 
   @Override
-  public double[] predict(InstanceContent instance) {
+  public BoostingModel createCopy() {
+    OzaBoost copy = new OzaBoost(this.ensembleSize);
+    System.arraycopy(this.lambda_correct, 0, copy.lambda_correct, 0, this.ensembleSize);
+    System.arraycopy(this.lambda_wrong, 0, copy.lambda_wrong, 0, this.ensembleSize);
+    System.arraycopy(this.epsilon, 0, copy.epsilon, 0, this.ensembleSize);
+    copy.lambda = this.lambda;
+    return copy;
+  }
+
+  @Override
+  public double[] predict(InstanceContent instance, DoubleVector weakPredictionsSum) {
     return new double[0];
+  }
+
+  @Override
+  public void weighPredictions(int learnerID, DoubleVector weakPredictions) {
+    double weight = 0.0;
+    if (epsilon[learnerID] != 0 && (epsilon[learnerID] != 1.0)) {
+      weight = Math.log((1 - epsilon[learnerID]) / epsilon[learnerID]);
+    }
+    if ((weight != 0.0) && (weight <= 0.5)) {
+      if (weakPredictions.sumOfValues() > 0) {
+        weakPredictions.normalize();
+        weakPredictions.scaleValues(weight);
+      }
+    }
+
   }
 
   @Override
@@ -65,7 +90,7 @@ public class OzaBoost implements BoostingModel {
       InstanceContent instanceWithModelIndex = new InstanceContent(trainInstance.getInstanceIndex(),
           trainInstance.getInstance(), trainInstance.isTraining(), trainInstance.isTesting());
       instanceWithModelIndex.setClassifierIndex(i);
-      incrementalUpdate(instanceWithModelIndex, votes[i]);
+      incrementalUpdate(instanceWithModelIndex, (int) votes[i]);
     }
   }
 
@@ -78,32 +103,36 @@ public class OzaBoost implements BoostingModel {
    * @param trainInstance An instance, with features, label and classifier index
    * @param prediction The predicted class index of a specific weak learner for the instance.
    */
-  public void incrementalUpdate(InstanceContent trainInstance, double prediction) {
+  public void incrementalUpdate(InstanceContent trainInstance, int prediction) {
     int modelIndex = trainInstance.getClassifierIndex();
-    if (trainInstance.getInstance().classValue() == prediction) { // TODO: How do we know if classValue and prediction index match?
+    if ((int) trainInstance.getInstance().classValue() == prediction) { // TODO: How do we know if classValue and prediction index match?
       lambda_correct[modelIndex] += lambda;
       epsilon[modelIndex] =
           lambda_correct[modelIndex] / (lambda_correct[modelIndex] + lambda_wrong[modelIndex]);
-      lambda *= 1 / (2 * (1 - epsilon[modelIndex]));
+      if (epsilon[modelIndex] != 1.0) {
+        lambda *= 1 / (2 * (1 - epsilon[modelIndex]));
+      }
     } else {
       lambda_wrong[modelIndex] += lambda;
       // TODO: The epsilon updates are the same for both cases, why?
       epsilon[modelIndex] =
           lambda_correct[modelIndex] / (lambda_correct[modelIndex] + lambda_wrong[modelIndex]);
-      lambda *= 1 / (2 * epsilon[modelIndex]);
+      if (epsilon[modelIndex] != 0.0) {
+        lambda *= 1 / (2 * epsilon[modelIndex]);
+      }
     }
   }
 
   @Override
-  public void updateWeak(InstanceContent instanceContent, LocalLearner weakLearner) {
+  public void updateModelAndWeak(InstanceContent instanceContent, LocalLearner weakLearner) {
     int k = MiscUtils.poisson(lambda, random); //set k according to poisson
     Instance trainInstance = instanceContent.getInstance();
     if (k > 0) {
       trainInstance.setWeight(trainInstance.weight() * k);
       weakLearner.trainOnInstance(trainInstance);
     }
-    //get prediction for the instance from the specific learner of the ensemble
-    double[] prediction = weakLearner.getVotesForInstance(trainInstance);
-    incrementalUpdate(instanceContent,  maxIndex(prediction));
+    // Get prediction for the instance from the specific learner of the ensemble
+    double[] votes = weakLearner.getVotesForInstance(trainInstance);
+    incrementalUpdate(instanceContent,  maxIndex(votes));
   }
 }

@@ -20,7 +20,9 @@ package org.apache.samoa.learners.classifiers.ensemble.boosting;
  */
 
 import org.apache.samoa.core.ContentEvent;
-import org.apache.samoa.core.DoubleVector;
+import org.apache.samoa.instances.Instance;
+import org.apache.samoa.learners.ResultContentEvent;
+import org.apache.samoa.moa.core.DoubleVector;
 import org.apache.samoa.core.Processor;
 import org.apache.samoa.learners.InstanceContentEvent;
 import org.apache.samoa.topology.Stream;
@@ -62,7 +64,8 @@ public class BoostModelProcessor implements Processor {
   @Override
   /**
    * For InstanceContentEvent's coming from the source, attach the boosting model and move forward.
-   * For BoostContentEvent coming from the last learner, update the model as needed.
+   * For BoostContentEvent coming from the last learner, update the model as needed, and put prediction on the output
+   * stream.
    */
   public boolean process(ContentEvent event) {
 
@@ -73,12 +76,18 @@ public class BoostModelProcessor implements Processor {
       learnerStream.put(new BoostContentEvent(
           (InstanceContentEvent) event, boostingModel, new DoubleVector(new double[ensembleSize])));
     } else { // Then we must have an BoostContentEvent
-      // So we update the model
       BoostContentEvent boostContentEvent = (BoostContentEvent) event;
+      InstanceContentEvent inEvent = boostContentEvent.getInstanceContentEvent();
+      Instance instance = inEvent.getInstance();
+      // So we update the model
       this.boostingModel = boostContentEvent.getBoostingModel();
-      // And push the event to the output.
-      // TODO: Will need to create a ResultContentEvent here, based on the prediction of the boosting model.
-      outputStream.put(boostContentEvent.getInstanceContentEvent());
+      // Get the aggregated predictions
+      DoubleVector predictionsSum = boostContentEvent.getPredictionSum();
+      // Create a result event and push it to the output stream.
+      ResultContentEvent outContentEvent = new ResultContentEvent(inEvent.getInstanceIndex(),
+          instance, inEvent.getClassId(), predictionsSum.getArrayRef(), inEvent.isLastEvent());
+      outputStream.put(outContentEvent);
+      // TODO: Handle last event?
     }
 
     return false; // TODO: When should we return true and when false?
