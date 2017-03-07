@@ -1,10 +1,35 @@
 package org.apache.samoa.learners.classifiers.ensemble.boosting;
 
+/*
+ * #%L
+ * SAMOA
+ * %%
+ * Copyright (C) 2014 - 2017 Apache Software Foundation
+ * %%
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * #L%
+ */
+
+import com.github.javacliparser.ClassOption;
+import com.github.javacliparser.Configurable;
+import com.github.javacliparser.IntOption;
 import com.google.common.collect.ImmutableSet;
 import org.apache.samoa.core.Processor;
 import org.apache.samoa.instances.Instances;
 import org.apache.samoa.learners.ClassificationLearner;
+import org.apache.samoa.learners.classifiers.LocalLearner;
 import org.apache.samoa.learners.classifiers.SimpleClassifierAdapter;
+import org.apache.samoa.moa.classifiers.Classifier;
 import org.apache.samoa.moa.classifiers.functions.MajorityClass;
 import org.apache.samoa.moa.classifiers.trees.DecisionStump;
 import org.apache.samoa.moa.classifiers.trees.HoeffdingTree;
@@ -33,7 +58,13 @@ import java.util.Set;
  * attaching an "outdated" model to them, until the previous instance has passed through the pipeline and the boosting
  * model is updated at the processor.
  */
-public class BoostLocal implements ClassificationLearner {
+public class BoostLocal implements ClassificationLearner, Configurable {
+
+  public IntOption ensembleSizeOption = new IntOption("ensembleSize", 's',
+      "The number of models in the bag.", 10, 1, Integer.MAX_VALUE);
+
+  public ClassOption baseLearnerOption = new ClassOption("baseLearner", 'l',
+      "Classifier to train.", org.apache.samoa.moa.classifiers.Classifier.class, DecisionStump.class.getName());
 
   private static final long serialVersionUID = -1853481790434442050L;
 
@@ -42,7 +73,7 @@ public class BoostLocal implements ClassificationLearner {
   @Override
   public void init(TopologyBuilder topologyBuilder, Instances dataset, int parallelism) {
 
-    final int ensembleSize = 5;
+    final int ensembleSize = ensembleSizeOption.getValue();
     // Allocate an array for the local processors
     BoostLocalProcessor[] localEnsemble = new BoostLocalProcessor[ensembleSize];
     // Instantiate the model processor and add it to the topology
@@ -55,7 +86,8 @@ public class BoostLocal implements ClassificationLearner {
       // of the BoostLocalProcessor? Given how Java handles objects, a reference to the localLearner object
       // is passed to the constructor of BoostLocalProcessor. Does this get recreated through the newProcessor
       // method of BoostLocalProcessor when the topology is instantiated?
-      SimpleClassifierAdapter localLearner = new SimpleClassifierAdapter(new DecisionStump(), dataset);
+      Classifier baseLearner = ((org.apache.samoa.moa.classifiers.Classifier) this.baseLearnerOption.getValue()).copy();
+      SimpleClassifierAdapter localLearner = new SimpleClassifierAdapter(baseLearner, dataset);
       // We add a local learner instance and the ensemble id to the local processor
       BoostLocalProcessor boostLocalProcessor = new BoostLocalProcessor(i, ensembleSize, localLearner);
       // TODO: Does this way of creating the processors actually provide any parallelism?
