@@ -37,16 +37,18 @@ import static org.apache.samoa.instances.Utils.maxIndex;
  */
 public class OzaBoost implements BoostingModel {
   private static final long serialVersionUID = -4360335604627806863L;
-  private static final Random random = new Random();
+  private static final Random random = new Random(1); // TODO: Properly initialize seed
   private final int ensembleSize;
   private double[] lambda_wrong;
   private double[] lambda_correct;
   private double[] epsilon;
   private double lambda;
+  private double trainingWeightSeenByModel;
 
   public OzaBoost(int ensembleSize) {
     this.ensembleSize = ensembleSize;
     lambda = 1.0;
+    trainingWeightSeenByModel = 0.0;
     lambda_correct = new double[ensembleSize];
     lambda_wrong = new double[ensembleSize];
     epsilon = new double[ensembleSize];
@@ -59,6 +61,7 @@ public class OzaBoost implements BoostingModel {
     System.arraycopy(this.lambda_wrong, 0, copy.lambda_wrong, 0, this.ensembleSize);
     System.arraycopy(this.epsilon, 0, copy.epsilon, 0, this.ensembleSize);
     copy.lambda = this.lambda;
+    copy.trainingWeightSeenByModel= this.trainingWeightSeenByModel;
     return copy;
   }
 
@@ -69,17 +72,21 @@ public class OzaBoost implements BoostingModel {
 
   @Override
   public void weighPredictions(int learnerID, DoubleVector weakPredictions) {
-    double weight = 0.0;
-    if (epsilon[learnerID] != 0 && (epsilon[learnerID] != 1.0)) {
-      weight = Math.log((1 - epsilon[learnerID]) / epsilon[learnerID]);
+    double weight;
+    double em = lambda_wrong[learnerID] / (lambda_correct[learnerID] + lambda_wrong[learnerID]);
+    if ((em == 0.0) || (em > 0.5)) {
+      weight = 0.0;
+    } else {
+      double Bm = em / (1.0 - em);
+      weight = Math.log(1.0 / Bm);
     }
-    if ((weight != 0.0) && (weight <= 0.5)) {
+
+    if ((weight > 0.0) ) {
       if (weakPredictions.sumOfValues() > 0) {
         weakPredictions.normalize();
         weakPredictions.scaleValues(weight);
       }
     }
-
   }
 
   @Override
@@ -107,24 +114,22 @@ public class OzaBoost implements BoostingModel {
     int modelIndex = trainInstance.getClassifierIndex();
     if ((int) trainInstance.getInstance().classValue() == prediction) { // TODO: How do we know if classValue and prediction index match?
       lambda_correct[modelIndex] += lambda;
-      epsilon[modelIndex] =
-          lambda_correct[modelIndex] / (lambda_correct[modelIndex] + lambda_wrong[modelIndex]);
-      if (epsilon[modelIndex] != 1.0) {
-        lambda *= 1 / (2 * (1 - epsilon[modelIndex]));
-      }
+      lambda *= trainingWeightSeenByModel / (2 * lambda_correct[modelIndex]);
     } else {
       lambda_wrong[modelIndex] += lambda;
-      // TODO: The epsilon updates are the same for both cases, why?
-      epsilon[modelIndex] =
-          lambda_correct[modelIndex] / (lambda_correct[modelIndex] + lambda_wrong[modelIndex]);
-      if (epsilon[modelIndex] != 0.0) {
-        lambda *= 1 / (2 * epsilon[modelIndex]);
-      }
+      lambda *= trainingWeightSeenByModel / (2 * lambda_wrong[modelIndex]);
     }
   }
 
   @Override
   public void updateModelAndWeak(InstanceContent instanceContent, LocalLearner weakLearner) {
+    // This is a crude way to estimate the weight seen by the model. If an instance has made it this far, we have
+    // trained the boosting model with it. Assuming all instances are incrementally indexed, their index will
+    // be the weight the model has seen so far TODO: Will prolly have to fix this at the interface level.
+    if (instanceContent.getInstanceIndex() < 0 ) {
+      return;
+    }
+    trainingWeightSeenByModel = instanceContent.getInstanceIndex();
     int k = MiscUtils.poisson(lambda, random); //set k according to poisson
     Instance trainInstance = instanceContent.getInstance();
     if (k > 0) {
@@ -134,5 +139,9 @@ public class OzaBoost implements BoostingModel {
     // Get prediction for the instance from the specific learner of the ensemble
     double[] votes = weakLearner.getVotesForInstance(trainInstance);
     incrementalUpdate(instanceContent,  maxIndex(votes));
+    if (instanceContent.getClassifierIndex() == ensembleSize - 1) { // If this is the last classifier in the pipeline
+      // Reset the lambda to 1.0
+      lambda = 1.0;
+    }
   }
 }

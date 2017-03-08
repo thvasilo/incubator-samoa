@@ -9,9 +9,9 @@ package org.apache.samoa.learners.classifiers.ensemble.boosting;
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
+ * 
  *      http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -73,7 +73,7 @@ public class BoostLocal implements ClassificationLearner, Configurable {
   @Override
   public void init(TopologyBuilder topologyBuilder, Instances dataset, int parallelism) {
 
-    final int ensembleSize = ensembleSizeOption.getValue();
+    int ensembleSize = ensembleSizeOption.getValue();
     // Allocate an array for the local processors
     BoostLocalProcessor[] localEnsemble = new BoostLocalProcessor[ensembleSize];
     // Instantiate the model processor and add it to the topology
@@ -97,7 +97,7 @@ public class BoostLocal implements ClassificationLearner, Configurable {
 
     // Connect the model processor to the first learner
     Stream learnerStream = topologyBuilder.createStream(boostModelProcessor);
-    topologyBuilder.connectInputShuffleStream(learnerStream, localEnsemble[0]);
+    topologyBuilder.connectInputAllStream(learnerStream, localEnsemble[0]);
     boostModelProcessor.setLearnerStream(learnerStream);
 
     // These streams move events from learner to learner
@@ -110,12 +110,12 @@ public class BoostLocal implements ClassificationLearner, Configurable {
     // Connect each learner to the next
     for (int i = 1; i < ensembleSize; i++) {
       // Connect the output of the previous to the current learner
-      topologyBuilder.connectInputKeyStream(localEnsemble[i - 1].getOutputStream(), localEnsemble[i]);
+      topologyBuilder.connectInputAllStream(localEnsemble[i - 1].getOutputStream(), localEnsemble[i]);
     }
     // Connect the last learner to the model processor, which handles the final output.
-    topologyBuilder.connectInputShuffleStream(localEnsemble[ensembleSize - 1].getOutputStream(), boostModelProcessor);
+    topologyBuilder.connectInputAllStream(localEnsemble[ensembleSize - 1].getOutputStream(), boostModelProcessor);
 
-    // Create the output stream from the model processor
+    // Create the output stream of the model processor
     Stream outputStream = topologyBuilder.createStream(boostModelProcessor);
     boostModelProcessor.setOutputStream(outputStream);
   }

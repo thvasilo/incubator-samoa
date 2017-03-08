@@ -85,15 +85,8 @@ public class BoostLocalProcessor implements Processor {
     Instance instance = newInstanceContent.getInstance();
     DoubleVector predictionsSum = new DoubleVector(boostContentEvent.getPredictionSum());
 
-    // Update the instance's classifier index
-    inEvent.setClassifierIndex(processorId);
-
-    if (inEvent.getInstanceIndex() < 0) {
-      // end learning
-      ResultContentEvent outContentEvent = new ResultContentEvent(-1, instance, 0,
-          new double[0], inEvent.isLastEvent());
-      return false;
-    }
+    // Update the instance's classifier index, this is used downstream to know which weak learner we are affecting
+    newInstanceContent.setClassifierIndex(processorId);
 
     if (inEvent.isTesting()) {
       // Make the weak learner prediction, weight it according to the boosting model, and add it to the running sum

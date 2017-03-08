@@ -47,6 +47,7 @@ public class BoostModelProcessor implements Processor {
   // and propagating them down the line (e.g. to the evaluator)
   private Stream outputStream;
   private int ensembleSize;
+  private long lastProcessedInstanceIndex = 0;
 
   public BoostModelProcessor(BoostingModel boostingModel, int ensembleSize) {
     this.boostingModel = boostingModel;
@@ -61,26 +62,50 @@ public class BoostModelProcessor implements Processor {
     this.ensembleSize = oldProcessor.ensembleSize;
   }
 
-  @Override
   /**
    * For InstanceContentEvent's coming from the source, attach the boosting model and move forward.
-   * For BoostContentEvent coming from the last learner, update the model as needed, and put prediction on the output
-   * stream.
+   * For BoostContentEvent coming from the last learner, update the model, and put prediction on the output stream.
    */
+  @Override
   public boolean process(ContentEvent event) {
 
     if (event instanceof InstanceContentEvent) { // Receive an instance event from the source
       // We augment the source event with the most up-to-date version of the model we have, and push it into the
       // boosting pipeline
-      // TODO: Here is where we might have to stall until the model update comes in from the last instance event
-      learnerStream.put(new BoostContentEvent(
-          (InstanceContentEvent) event, boostingModel, new DoubleVector(new double[ensembleSize])));
+      InstanceContentEvent inEvent = (InstanceContentEvent) event;
+      if (inEvent.getInstanceIndex() < 0) {
+        // end learning
+        int numClasses = inEvent.getInstanceContent().getInstance().numClasses();
+        learnerStream.put(new BoostContentEvent(
+            (InstanceContentEvent) event, boostingModel, new DoubleVector(new double[numClasses])));
+        return true;
+      }
+      if (inEvent.getInstanceIndex() !=  lastProcessedInstanceIndex + 1) {
+        // Reject the event until the previous instance has returned from the boosting pipeline
+        return false;
+      } else {
+        int numClasses = inEvent.getInstanceContent().getInstance().numClasses();
+        learnerStream.put(new BoostContentEvent(
+            (InstanceContentEvent) event, boostingModel, new DoubleVector(new double[numClasses])));
+        return true;
+      }
+
     } else { // Then we must have an BoostContentEvent
       BoostContentEvent boostContentEvent = (BoostContentEvent) event;
       InstanceContentEvent inEvent = boostContentEvent.getInstanceContentEvent();
       Instance instance = inEvent.getInstance();
+      if (inEvent.getInstanceIndex() < 0) {
+        // end learning
+        ResultContentEvent outContentEvent = new ResultContentEvent(-1, instance, 0,
+            new double[0], true);
+        outputStream.put(outContentEvent);
+        return false;
+      }
+
+      // Update the indicator of the last instance that was fully processed
+      lastProcessedInstanceIndex = inEvent.getInstanceIndex();
       // So we update the model
-      this.boostingModel = boostContentEvent.getBoostingModel();
+      boostingModel = boostContentEvent.getBoostingModel();
       // Get the aggregated predictions
       DoubleVector predictionsSum = boostContentEvent.getPredictionSum();
       // Create a result event and push it to the output stream.
@@ -88,9 +113,8 @@ public class BoostModelProcessor implements Processor {
           instance, inEvent.getClassId(), predictionsSum.getArrayRef(), inEvent.isLastEvent());
       outputStream.put(outContentEvent);
       // TODO: Handle last event?
+      return true;
     }
-
-    return false; // TODO: When should we return true and when false?
   }
 
   @Override
