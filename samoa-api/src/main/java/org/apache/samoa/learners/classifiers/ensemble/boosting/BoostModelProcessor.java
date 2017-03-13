@@ -80,15 +80,10 @@ public class BoostModelProcessor implements Processor {
             (InstanceContentEvent) event, boostingModel, new DoubleVector(new double[numClasses])));
         return true;
       }
-      if (inEvent.getInstanceIndex() !=  lastProcessedInstanceIndex + 1) {
-        // Reject the event until the previous instance has returned from the boosting pipeline
-        return false;
-      } else {
-        int numClasses = inEvent.getInstanceContent().getInstance().numClasses();
-        learnerStream.put(new BoostContentEvent(
-            (InstanceContentEvent) event, boostingModel, new DoubleVector(new double[numClasses])));
-        return true;
-      }
+      int numClasses = inEvent.getInstanceContent().getInstance().numClasses();
+      learnerStream.put(new BoostContentEvent(
+          (InstanceContentEvent) event, boostingModel, new DoubleVector(new double[numClasses])));
+      return true;
 
     } else { // Then we must have an BoostContentEvent
       BoostContentEvent boostContentEvent = (BoostContentEvent) event;
