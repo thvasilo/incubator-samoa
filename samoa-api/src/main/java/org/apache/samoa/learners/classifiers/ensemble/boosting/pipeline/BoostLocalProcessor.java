@@ -1,4 +1,4 @@
-package org.apache.samoa.learners.classifiers.ensemble.boosting;
+package org.apache.samoa.learners.classifiers.ensemble.boosting.pipeline;
 /*
  * #%L
  * SAMOA
@@ -24,7 +24,6 @@ import org.apache.samoa.core.Processor;
 import org.apache.samoa.instances.Instance;
 import org.apache.samoa.learners.InstanceContent;
 import org.apache.samoa.learners.InstanceContentEvent;
-import org.apache.samoa.learners.ResultContentEvent;
 import org.apache.samoa.learners.classifiers.LocalLearner;
 import org.apache.samoa.moa.core.DoubleVector;
 import org.apache.samoa.topology.Stream;
@@ -104,7 +103,8 @@ public class BoostLocalProcessor implements Processor {
 
     // No need to create new event, all the event components are modified in-place
     outputStream.put(new BoostContentEvent(inEvent, boostingModel, predictionsSum));
-    return true;
+    return (processorId == ensembleSize - 1);
+
   }
 
   @Override

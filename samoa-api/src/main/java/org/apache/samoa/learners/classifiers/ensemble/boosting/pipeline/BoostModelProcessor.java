@@ -1,4 +1,4 @@
-package org.apache.samoa.learners.classifiers.ensemble.boosting;
+package org.apache.samoa.learners.classifiers.ensemble.boosting.pipeline;
 /*
  * #%L
  * SAMOA
@@ -19,7 +19,6 @@ package org.apache.samoa.learners.classifiers.ensemble.boosting;
  * #L%
  */
 
-import org.apache.commons.collections.ArrayStack;
 import org.apache.samoa.core.ContentEvent;
 import org.apache.samoa.instances.Instance;
 import org.apache.samoa.learners.ResultContentEvent;
@@ -31,8 +30,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayDeque;
-import java.util.Queue;
-import java.util.Stack;
 
 /**
  * Handles the updating of the model, and the propagation of the updated model at each super-step

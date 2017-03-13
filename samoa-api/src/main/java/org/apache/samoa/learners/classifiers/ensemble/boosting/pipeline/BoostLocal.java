@@ -1,4 +1,4 @@
-package org.apache.samoa.learners.classifiers.ensemble.boosting;
+package org.apache.samoa.learners.classifiers.ensemble.boosting.pipeline;
 
 /*
  * #%L
@@ -27,12 +27,9 @@ import com.google.common.collect.ImmutableSet;
 import org.apache.samoa.core.Processor;
 import org.apache.samoa.instances.Instances;
 import org.apache.samoa.learners.ClassificationLearner;
-import org.apache.samoa.learners.classifiers.LocalLearner;
 import org.apache.samoa.learners.classifiers.SimpleClassifierAdapter;
 import org.apache.samoa.moa.classifiers.Classifier;
-import org.apache.samoa.moa.classifiers.functions.MajorityClass;
 import org.apache.samoa.moa.classifiers.trees.DecisionStump;
-import org.apache.samoa.moa.classifiers.trees.HoeffdingTree;
 import org.apache.samoa.topology.Stream;
 import org.apache.samoa.topology.TopologyBuilder;
 
