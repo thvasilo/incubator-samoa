@@ -28,6 +28,8 @@ public class ModelAggregatorProcessor implements Processor {
   private static final long serialVersionUID = -8340785601983207579L;
   private Stream outputStream;
   private Stream modelUpdateStream;
+  private int boostingState = 0;
+  private int round;
 
   @Override
   public boolean process(ContentEvent event) {
@@ -35,8 +37,9 @@ public class ModelAggregatorProcessor implements Processor {
     InstanceContentEvent inEvent = (InstanceContentEvent) event;
     System.out.println(String.format("The event %d from WL %d has entered the ModelAggregatorProcessor",
         inEvent.getInstanceIndex(), inEvent.getClassifierIndex()));
-
-//    outputStream.put(inEvent);
+    boostingState++;
+    round++;
+    modelUpdateStream.put(new POCABoostingEvent(inEvent.getClassifierIndex(), boostingState, round));
     return true;
   }
 
@@ -50,6 +53,7 @@ public class ModelAggregatorProcessor implements Processor {
     ModelAggregatorProcessor oldLocalProcessor = (ModelAggregatorProcessor) oldProcessor;
     ModelAggregatorProcessor newProcessor = new ModelAggregatorProcessor();
     newProcessor.setOutputStream(oldLocalProcessor.getOutputStream());
+    newProcessor.setModelUpdateStream(oldLocalProcessor.getModelUpdateStream());
     return newProcessor;
 
   }
@@ -64,5 +68,9 @@ public class ModelAggregatorProcessor implements Processor {
 
   public void setOutputStream(Stream outputStream) {
     this.outputStream = outputStream;
+  }
+
+  public void setModelUpdateStream(Stream modelUpdateStream) {
+    this.modelUpdateStream = modelUpdateStream;
   }
 }

@@ -37,6 +37,8 @@ public class POCAWeakLearnerProcessor implements Processor{
   // POCA state variables
   private double q, s;
   private DoubleVector epsilon;
+  private int learnerState = 0;
+  private int boostingState = 0; // TODO: Will this be shared among objects?
 
 
   // This is the local learner instance that we will be training.
@@ -54,14 +56,30 @@ public class POCAWeakLearnerProcessor implements Processor{
 
   @Override
   public boolean process(ContentEvent event) {
-    InstanceContentEvent inEvent = (InstanceContentEvent) event;
-    System.out.println(String.format("The event %d has entered WeakProcessor %d",
-        inEvent.getInstanceIndex(), processorId));
-    Instance instanceCopy = inEvent.getInstance().copy();
-    InstanceContentEvent outEvent = new InstanceContentEvent(inEvent.getInstanceIndex(), instanceCopy,
-        inEvent.isTraining(), inEvent.isTesting());
-    outEvent.setClassifierIndex(processorId);
-    learnerOutputStream.put(outEvent);
+
+    if (event instanceof InstanceContentEvent) { // Handle input/training events
+      InstanceContentEvent inEvent = (InstanceContentEvent) event;
+      Instance instanceCopy = inEvent.getInstance().copy();
+      InstanceContentEvent outEvent = new InstanceContentEvent(inEvent.getInstanceIndex(), instanceCopy,
+          inEvent.isTraining(), inEvent.isTesting());
+      outEvent.setClassifierIndex(processorId);
+      // TODO: I might need a POCABoostingEvent here, which includes the InstanceContentEvent
+      // WL state update
+      learnerState++;
+      System.out.printf("The event %d has entered WeakProcessor %d, with WL state %d.%n",
+          inEvent.getInstanceIndex(), processorId, learnerState);
+      learnerOutputStream.put(outEvent);
+    } else { // Event is from the ModelProcessor
+      POCABoostingEvent pocaEvent = (POCABoostingEvent) event;
+      boostingState = pocaEvent.getBoostingState();
+      System.out.printf("The state event aimed for WL %d with key %s from round %d has entered " +
+              "WeakProcessor %d with boosting state %d.%n",
+          pocaEvent.getWeakLearnerID(), pocaEvent.getKey(), pocaEvent.getRound(), processorId,
+          pocaEvent.getBoostingState());
+      System.out.printf("The WL's state is %d.%n", learnerState);
+    }
+
+
     return true;
   }
 

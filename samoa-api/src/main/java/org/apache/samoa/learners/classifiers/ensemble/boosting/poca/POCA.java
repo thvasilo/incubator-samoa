@@ -82,12 +82,9 @@ public class POCA implements Learner, Configurable {
     weakLearnerProcessor.setLearnerOutputStream(weakLearnerStream);
 
     // The model processor pushes updates back to the weak learners, using key distribution to route events
-    // TODO: the output needs to be regulated at the mode processor, otherwise each and every event ends up back
-    // in the weak learners
-//    Stream modelStream = topologyBuilder.createStream(modelProcessor);
-//    topologyBuilder.connectInputKeyStream(modelStream, weakLearnerProcessor);
-//    // This also acts as the output stream
-//    modelProcessor.setOutputStream(modelStream);
+    Stream modelUpdateStream = topologyBuilder.createStream(modelProcessor);
+    topologyBuilder.connectInputKeyStream(modelUpdateStream, weakLearnerProcessor);
+    modelProcessor.setModelUpdateStream(modelUpdateStream);
   }
 
   @Override
