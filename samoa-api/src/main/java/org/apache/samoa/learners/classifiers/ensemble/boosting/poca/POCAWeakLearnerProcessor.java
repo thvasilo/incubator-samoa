@@ -31,7 +31,7 @@ public class POCAWeakLearnerProcessor implements Processor{
   // TODO: Can probably just extend BoostLocalProcessor
 
   private static final long serialVersionUID = -4897291821301014811L;
-  private int processorId;
+  private int weakLearnerId;
   private final int ensembleSize;
 
   // POCA state variables
@@ -62,21 +62,22 @@ public class POCAWeakLearnerProcessor implements Processor{
       Instance instanceCopy = inEvent.getInstance().copy();
       InstanceContentEvent outEvent = new InstanceContentEvent(inEvent.getInstanceIndex(), instanceCopy,
           inEvent.isTraining(), inEvent.isTesting());
-      outEvent.setClassifierIndex(processorId);
+      outEvent.setClassifierIndex(weakLearnerId);
       // TODO: I might need a POCABoostingEvent here, which includes the InstanceContentEvent
       // WL state update
       learnerState++;
       System.out.printf("The event %d has entered WeakProcessor %d, with WL state %d.%n",
-          inEvent.getInstanceIndex(), processorId, learnerState);
-      learnerOutputStream.put(outEvent);
+          inEvent.getInstanceIndex(), weakLearnerId, learnerState);
+      // Add the weak learner state/error rate to the event and send it on to the ModelAggregator
+      learnerOutputStream.put(new POCALearnerEvent(outEvent, learnerState));
     } else { // Event is from the ModelProcessor
       POCABoostingEvent pocaEvent = (POCABoostingEvent) event;
       boostingState = pocaEvent.getBoostingState();
       System.out.printf("The state event aimed for WL %d with key %s from round %d has entered " +
               "WeakProcessor %d with boosting state %d.%n",
-          pocaEvent.getWeakLearnerID(), pocaEvent.getKey(), pocaEvent.getRound(), processorId,
+          pocaEvent.getWeakLearnerID(), pocaEvent.getKey(), pocaEvent.getRound(), weakLearnerId,
           pocaEvent.getBoostingState());
-      System.out.printf("The WL's state is %d.%n", learnerState);
+      System.out.printf("The WL's state, %d, has been added to the boosting state.%n", learnerState);
     }
 
 
@@ -86,7 +87,7 @@ public class POCAWeakLearnerProcessor implements Processor{
   @Override
   public void onCreate(int id) {
     localLearner.resetLearning();
-    processorId = id;
+    weakLearnerId = id;
   }
 
   @Override
@@ -100,8 +101,8 @@ public class POCAWeakLearnerProcessor implements Processor{
     return newProcessor;
   }
 
-  public int getProcessorId() {
-    return processorId;
+  public int getWeakLearnerId() {
+    return weakLearnerId;
   }
 
   public int getEnsembleSize() {

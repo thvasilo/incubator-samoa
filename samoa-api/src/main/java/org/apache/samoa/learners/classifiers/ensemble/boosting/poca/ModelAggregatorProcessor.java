@@ -19,28 +19,66 @@ package org.apache.samoa.learners.classifiers.ensemble.boosting.poca;
  * #L%
  */
 
+import org.apache.commons.collections.ArrayStack;
 import org.apache.samoa.core.ContentEvent;
 import org.apache.samoa.core.Processor;
 import org.apache.samoa.learners.InstanceContentEvent;
 import org.apache.samoa.topology.Stream;
+
+import java.util.Arrays;
 
 public class ModelAggregatorProcessor implements Processor {
   private static final long serialVersionUID = -8340785601983207579L;
   private Stream outputStream;
   private Stream modelUpdateStream;
   private int boostingState = 0;
-  private int round;
+  private int round = 0;
+  private int[] weakLearnerStates;
 
   @Override
   public boolean process(ContentEvent event) {
 
-    InstanceContentEvent inEvent = (InstanceContentEvent) event;
+    POCALearnerEvent pocaLearnerEvent = (POCALearnerEvent) event;
+    InstanceContentEvent inEvent = pocaLearnerEvent.getInstanceContentEvent();
+    int sourceWLID = inEvent.getClassifierIndex();
     System.out.println(String.format("The event %d from WL %d has entered the ModelAggregatorProcessor",
-        inEvent.getInstanceIndex(), inEvent.getClassifierIndex()));
-    boostingState++;
-    round++;
-    modelUpdateStream.put(new POCABoostingEvent(inEvent.getClassifierIndex(), boostingState, round));
+        inEvent.getInstanceIndex(), sourceWLID));
+    weakLearnerStates[sourceWLID] = pocaLearnerEvent.getWeakLearnerState();
+    // Crude readiness check, can prolly maintain one boolean to do this instead of iterating over all every time
+    boolean readyToSend = true;
+    for (int wlState : weakLearnerStates) {
+      if (wlState == -1) {
+        readyToSend = false;
+        break;
+      }
+    }
+    if (readyToSend) {
+      for (int i = 1; i <= weakLearnerStates.length; i++) {
+        // "Reverse-engineer" the shuffling mechanism
+        int destinationID = i % weakLearnerStates.length;
+        int weakLearnerState = weakLearnerStates[destinationID];
+        boostingState += weakLearnerState;
+        modelUpdateStream.put(new POCABoostingEvent(destinationID, boostingState, round));
+      }
+      Arrays.fill(weakLearnerStates, -1);
+      round++;
+    }
+
     return true;
+  }
+
+  public ModelAggregatorProcessor(int ensembleSize) {
+    this.weakLearnerStates = new int[ensembleSize];
+    // Initialize to -1, indicating missing value
+    Arrays.fill(weakLearnerStates, -1);
+  }
+
+  public ModelAggregatorProcessor(ModelAggregatorProcessor other) {
+    this.outputStream = other.outputStream;
+    this.modelUpdateStream = other.modelUpdateStream;
+    this.boostingState = other.boostingState;
+    this.round = other.round;
+    this.weakLearnerStates = Arrays.copyOf(other.weakLearnerStates, other.weakLearnerStates.length);
   }
 
   @Override
@@ -51,11 +89,7 @@ public class ModelAggregatorProcessor implements Processor {
   @Override
   public Processor newProcessor(Processor oldProcessor) {
     ModelAggregatorProcessor oldLocalProcessor = (ModelAggregatorProcessor) oldProcessor;
-    ModelAggregatorProcessor newProcessor = new ModelAggregatorProcessor();
-    newProcessor.setOutputStream(oldLocalProcessor.getOutputStream());
-    newProcessor.setModelUpdateStream(oldLocalProcessor.getModelUpdateStream());
-    return newProcessor;
-
+    return new ModelAggregatorProcessor(oldLocalProcessor);
   }
 
   public Stream getModelUpdateStream() {
@@ -72,5 +106,9 @@ public class ModelAggregatorProcessor implements Processor {
 
   public void setModelUpdateStream(Stream modelUpdateStream) {
     this.modelUpdateStream = modelUpdateStream;
+  }
+
+  public void setWeakLearnerStates(int[] weakLearnerStates) {
+    this.weakLearnerStates = weakLearnerStates;
   }
 }

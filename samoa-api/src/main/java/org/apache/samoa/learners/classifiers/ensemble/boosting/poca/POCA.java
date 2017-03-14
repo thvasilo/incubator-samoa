@@ -73,7 +73,7 @@ public class POCA implements Learner, Configurable {
     inputProcessor.setInputEventStream(inputStream);
 
     // Create the model processor that is used to aggregate the outcomes, and pass back updates of the WLs
-    modelProcessor = new ModelAggregatorProcessor();
+    modelProcessor = new ModelAggregatorProcessor(ensembleSize);
     topologyBuilder.addProcessor(modelProcessor);
 
     // We then gather the outputs of the learners in the model processor, from all WLs to the one model processor
@@ -83,7 +83,7 @@ public class POCA implements Learner, Configurable {
 
     // The model processor pushes updates back to the weak learners, using key distribution to route events
     Stream modelUpdateStream = topologyBuilder.createStream(modelProcessor);
-    topologyBuilder.connectInputKeyStream(modelUpdateStream, weakLearnerProcessor);
+    topologyBuilder.connectInputShuffleStream(modelUpdateStream, weakLearnerProcessor);
     modelProcessor.setModelUpdateStream(modelUpdateStream);
   }
 
