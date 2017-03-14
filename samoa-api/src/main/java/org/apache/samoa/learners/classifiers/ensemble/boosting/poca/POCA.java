@@ -28,6 +28,7 @@ import org.apache.samoa.instances.Instances;
 import org.apache.samoa.learners.Learner;
 import org.apache.samoa.learners.classifiers.SimpleClassifierAdapter;
 import org.apache.samoa.moa.classifiers.Classifier;
+import org.apache.samoa.moa.classifiers.functions.MajorityClass;
 import org.apache.samoa.moa.classifiers.trees.DecisionStump;
 import org.apache.samoa.topology.Stream;
 import org.apache.samoa.topology.TopologyBuilder;
@@ -37,14 +38,14 @@ import java.util.Set;
 public class POCA implements Learner, Configurable {
   private static final long serialVersionUID = 6250360713967443231L;
 
-  private ModelProcessor modelProcessor;
+  private ModelAggregatorProcessor modelProcessor;
   private InputProcessor inputProcessor;
 
   public IntOption ensembleSizeOption = new IntOption("ensembleSize", 's',
-      "The number of models in the bag.", 10, 1, Integer.MAX_VALUE);
+      "The number of models in the bag.", 5, 1, Integer.MAX_VALUE);
 
   public ClassOption baseLearnerOption = new ClassOption("baseLearner", 'l',
-      "Classifier to train.", org.apache.samoa.moa.classifiers.Classifier.class, DecisionStump.class.getName());
+      "Classifier to train.", org.apache.samoa.moa.classifiers.Classifier.class, MajorityClass.class.getName());
 
   @Override
   public void init(TopologyBuilder topologyBuilder, Instances dataset, int parallelism) {
@@ -72,19 +73,21 @@ public class POCA implements Learner, Configurable {
     inputProcessor.setInputEventStream(inputStream);
 
     // Create the model processor that is used to aggregate the outcomes, and pass back updates of the WLs
-    modelProcessor = new ModelProcessor();
+    modelProcessor = new ModelAggregatorProcessor();
     topologyBuilder.addProcessor(modelProcessor);
 
     // We then gather the outputs of the learners in the model processor, from all WLs to the one model processor
     Stream weakLearnerStream = topologyBuilder.createStream(weakLearnerProcessor);
     topologyBuilder.connectInputAllStream(weakLearnerStream, modelProcessor);
-    weakLearnerProcessor.setOutputStream(weakLearnerStream);
+    weakLearnerProcessor.setLearnerOutputStream(weakLearnerStream);
 
     // The model processor pushes updates back to the weak learners, using key distribution to route events
-    Stream modelStream = topologyBuilder.createStream(modelProcessor);
-    topologyBuilder.connectInputKeyStream(modelStream, weakLearnerProcessor);
-    // This also acts as the output stream
-    modelProcessor.setOutputStream(modelStream);
+    // TODO: the output needs to be regulated at the mode processor, otherwise each and every event ends up back
+    // in the weak learners
+//    Stream modelStream = topologyBuilder.createStream(modelProcessor);
+//    topologyBuilder.connectInputKeyStream(modelStream, weakLearnerProcessor);
+//    // This also acts as the output stream
+//    modelProcessor.setOutputStream(modelStream);
   }
 
   @Override

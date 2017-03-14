@@ -21,7 +21,10 @@ package org.apache.samoa.learners.classifiers.ensemble.boosting.poca;
 
 import org.apache.samoa.core.ContentEvent;
 import org.apache.samoa.core.Processor;
+import org.apache.samoa.learners.InstanceContentEvent;
 import org.apache.samoa.topology.Stream;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The input processor is quite simple, it just gets the input from the source and broadcasts it
@@ -30,10 +33,15 @@ import org.apache.samoa.topology.Stream;
 public class InputProcessor implements Processor {
   private static final long serialVersionUID = 321254207612577237L;
 
-  Stream inputEventStream;
+  private Stream inputEventStream;
+
+  private static final Logger logger =
+      LoggerFactory.getLogger(InputProcessor.class);
 
   @Override
   public boolean process(ContentEvent event) {
+    InstanceContentEvent inEvent = (InstanceContentEvent) event;
+    System.out.printf("The event %d has entered the InputProcessor. %n", inEvent.getInstanceIndex());
     inputEventStream.put(event);
     return true;
   }
@@ -44,8 +52,11 @@ public class InputProcessor implements Processor {
   }
 
   @Override
-  public Processor newProcessor(Processor processor) {
-    return null;
+  public Processor newProcessor(Processor oldProcessor) {
+    InputProcessor oldLocalProcessor = (InputProcessor) oldProcessor;
+    InputProcessor newProcessor = new InputProcessor();
+    newProcessor.setInputEventStream(oldLocalProcessor.getInputEventStream());
+    return newProcessor;
   }
 
   public Stream getInputEventStream() {

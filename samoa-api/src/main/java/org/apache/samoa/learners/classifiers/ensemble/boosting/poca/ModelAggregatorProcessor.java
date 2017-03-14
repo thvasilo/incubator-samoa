@@ -21,15 +21,23 @@ package org.apache.samoa.learners.classifiers.ensemble.boosting.poca;
 
 import org.apache.samoa.core.ContentEvent;
 import org.apache.samoa.core.Processor;
+import org.apache.samoa.learners.InstanceContentEvent;
 import org.apache.samoa.topology.Stream;
 
-public class ModelProcessor implements Processor {
+public class ModelAggregatorProcessor implements Processor {
+  private static final long serialVersionUID = -8340785601983207579L;
   private Stream outputStream;
   private Stream modelUpdateStream;
 
   @Override
   public boolean process(ContentEvent event) {
-    return false;
+
+    InstanceContentEvent inEvent = (InstanceContentEvent) event;
+    System.out.println(String.format("The event %d from WL %d has entered the ModelAggregatorProcessor",
+        inEvent.getInstanceIndex(), inEvent.getClassifierIndex()));
+
+//    outputStream.put(inEvent);
+    return true;
   }
 
   @Override
@@ -38,8 +46,12 @@ public class ModelProcessor implements Processor {
   }
 
   @Override
-  public Processor newProcessor(Processor processor) {
-    return null;
+  public Processor newProcessor(Processor oldProcessor) {
+    ModelAggregatorProcessor oldLocalProcessor = (ModelAggregatorProcessor) oldProcessor;
+    ModelAggregatorProcessor newProcessor = new ModelAggregatorProcessor();
+    newProcessor.setOutputStream(oldLocalProcessor.getOutputStream());
+    return newProcessor;
+
   }
 
   public Stream getModelUpdateStream() {

@@ -22,6 +22,7 @@ package org.apache.samoa.learners.classifiers.ensemble.boosting.poca;
 import org.apache.samoa.core.ContentEvent;
 import org.apache.samoa.core.DoubleVector;
 import org.apache.samoa.core.Processor;
+import org.apache.samoa.learners.InstanceContentEvent;
 import org.apache.samoa.learners.classifiers.LocalLearner;
 import org.apache.samoa.topology.Stream;
 
@@ -41,7 +42,7 @@ public class POCAWeakLearnerProcessor implements Processor{
   private LocalLearner localLearner;
 
   // The output stream is directed either at the next learner in the boosting pipeline, or the BoostModelProcessor
-  private Stream outputStream;
+  private Stream learnerOutputStream;
 
 
   public POCAWeakLearnerProcessor(int ensembleSize, LocalLearner localLearner) {
@@ -52,7 +53,13 @@ public class POCAWeakLearnerProcessor implements Processor{
 
   @Override
   public boolean process(ContentEvent event) {
-    return false;
+    InstanceContentEvent inEvent = (InstanceContentEvent) event;
+    System.out.println(String.format("The event %d has entered WeakProcessor %d",
+        inEvent.getInstanceIndex(), processorId));
+    inEvent.setClassifierIndex(processorId);
+
+    learnerOutputStream.put(inEvent);
+    return true;
   }
 
   @Override
@@ -68,7 +75,7 @@ public class POCAWeakLearnerProcessor implements Processor{
         oldLocalProcessor.getEnsembleSize(),
         oldLocalProcessor.getLocalLearner());
     newProcessor.getLocalLearner().resetLearning();
-    newProcessor.setOutputStream(oldLocalProcessor.getOutputStream());
+    newProcessor.setLearnerOutputStream(oldLocalProcessor.getLearnerOutputStream());
     return newProcessor;
   }
 
@@ -84,11 +91,11 @@ public class POCAWeakLearnerProcessor implements Processor{
     return localLearner;
   }
 
-  public Stream getOutputStream() {
-    return outputStream;
+  public Stream getLearnerOutputStream() {
+    return learnerOutputStream;
   }
 
-  public void setOutputStream(Stream outputStream) {
-    this.outputStream = outputStream;
+  public void setLearnerOutputStream(Stream learnerOutputStream) {
+    this.learnerOutputStream = learnerOutputStream;
   }
 }
