@@ -41,7 +41,7 @@ public class InputProcessor implements Processor {
   @Override
   public boolean process(ContentEvent event) {
     InstanceContentEvent inEvent = (InstanceContentEvent) event;
-    System.out.printf("The event %d has entered the InputProcessor. %n", inEvent.getInstanceIndex());
+    System.out.printf("The event %d has entered the InputProcessor.%n", inEvent.getInstanceIndex());
     inputEventStream.put(event);
     return true;
   }

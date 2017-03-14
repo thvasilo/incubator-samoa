@@ -22,6 +22,7 @@ package org.apache.samoa.learners.classifiers.ensemble.boosting.poca;
 import org.apache.samoa.core.ContentEvent;
 import org.apache.samoa.core.DoubleVector;
 import org.apache.samoa.core.Processor;
+import org.apache.samoa.instances.Instance;
 import org.apache.samoa.learners.InstanceContentEvent;
 import org.apache.samoa.learners.classifiers.LocalLearner;
 import org.apache.samoa.topology.Stream;
@@ -56,9 +57,11 @@ public class POCAWeakLearnerProcessor implements Processor{
     InstanceContentEvent inEvent = (InstanceContentEvent) event;
     System.out.println(String.format("The event %d has entered WeakProcessor %d",
         inEvent.getInstanceIndex(), processorId));
-    inEvent.setClassifierIndex(processorId);
-
-    learnerOutputStream.put(inEvent);
+    Instance instanceCopy = inEvent.getInstance().copy();
+    InstanceContentEvent outEvent = new InstanceContentEvent(inEvent.getInstanceIndex(), instanceCopy,
+        inEvent.isTraining(), inEvent.isTesting());
+    outEvent.setClassifierIndex(processorId);
+    learnerOutputStream.put(outEvent);
     return true;
   }
 
