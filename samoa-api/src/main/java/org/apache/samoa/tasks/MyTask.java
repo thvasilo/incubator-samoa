@@ -22,7 +22,8 @@ package org.apache.samoa.tasks;
 import com.github.javacliparser.ClassOption;
 import com.github.javacliparser.Configurable;
 import com.github.javacliparser.IntOption;
-import org.apache.samoa.learners.classifiers.ensemble.boosting.pipeline.BoostLocal;
+import org.apache.samoa.learners.Learner;
+import org.apache.samoa.learners.classifiers.ensemble.boosting.poca.POCA;
 import org.apache.samoa.streams.InstanceStream;
 import org.apache.samoa.streams.PrequentialSourceProcessor;
 import org.apache.samoa.streams.generators.RandomTreeGenerator;
@@ -37,6 +38,9 @@ public class MyTask implements Task, Configurable {
   private TopologyBuilder topologyBuilder;
   /** The topology that will be created for the task */
   private Topology myTopology;
+
+  public ClassOption learnerOption = new ClassOption("learner", 'l', "The learner to use",
+      Learner.class, POCA.class.getName());
 
   // Options need to be public so they are visible for the config
   public ClassOption streamTrainOption = new ClassOption("trainStream", 's', "Stream to learn from.",
@@ -58,11 +62,11 @@ public class MyTask implements Task, Configurable {
     Stream sourcePiOutputStream = topologyBuilder.createStream(preqSource);
 
     // Instantiate the processor
-    BoostLocal boostLocal = new BoostLocal();
-    boostLocal.init(topologyBuilder, preqSource.getDataset(), 1);
+    Learner learner = learnerOption.getValue();
+    learner.init(topologyBuilder, preqSource.getDataset(), 1);
 
     // Connect the input stream to the processor
-    topologyBuilder.connectInputShuffleStream(sourcePiOutputStream, boostLocal.getInputProcessor());
+    topologyBuilder.connectInputShuffleStream(sourcePiOutputStream, learner.getInputProcessor());
 
     myTopology = topologyBuilder.build();
   }
