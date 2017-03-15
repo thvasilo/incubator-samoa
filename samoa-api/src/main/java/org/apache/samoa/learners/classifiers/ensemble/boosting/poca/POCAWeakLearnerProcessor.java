@@ -33,6 +33,7 @@ public class POCAWeakLearnerProcessor implements Processor{
   private static final long serialVersionUID = -4897291821301014811L;
   private int weakLearnerId;
   private final int ensembleSize;
+  private final boolean threadsEngine;
 
   // POCA state variables
   private double q, s;
@@ -48,11 +49,21 @@ public class POCAWeakLearnerProcessor implements Processor{
   private Stream learnerOutputStream;
 
 
-  public POCAWeakLearnerProcessor(int ensembleSize, LocalLearner localLearner) {
+  public POCAWeakLearnerProcessor(int ensembleSize, LocalLearner localLearner, boolean threadsEngine) {
     this.localLearner = localLearner;
     this.ensembleSize = ensembleSize;
+    this.threadsEngine = threadsEngine;
   }
 
+  public POCAWeakLearnerProcessor(POCAWeakLearnerProcessor other) {
+    this.weakLearnerId = other.weakLearnerId;
+    this.ensembleSize = other.ensembleSize;
+    this.threadsEngine = other.threadsEngine;
+    this.learnerState = other.learnerState;
+    this.localLearner = other.localLearner;
+    this.learnerOutputStream = other.learnerOutputStream;
+    this.boostingState = other.boostingState;
+  }
 
   @Override
   public boolean process(ContentEvent event) {
@@ -63,7 +74,6 @@ public class POCAWeakLearnerProcessor implements Processor{
       InstanceContentEvent outEvent = new InstanceContentEvent(inEvent.getInstanceIndex(), instanceCopy,
           inEvent.isTraining(), inEvent.isTesting());
       outEvent.setClassifierIndex(weakLearnerId);
-      // TODO: I might need a POCABoostingEvent here, which includes the InstanceContentEvent
       // WL state update
       learnerState++;
       System.out.printf("The event %d has entered WeakProcessor %d, with WL state %d.%n",
@@ -87,18 +97,18 @@ public class POCAWeakLearnerProcessor implements Processor{
   @Override
   public void onCreate(int id) {
     localLearner.resetLearning();
-    weakLearnerId = id;
+    if (threadsEngine) {
+      weakLearnerId = id - 1;
+    } else {
+      weakLearnerId = id;
+    }
+
   }
 
   @Override
   public Processor newProcessor(Processor oldProcessor) {
     POCAWeakLearnerProcessor oldLocalProcessor = (POCAWeakLearnerProcessor) oldProcessor;
-    POCAWeakLearnerProcessor newProcessor = new POCAWeakLearnerProcessor(
-        oldLocalProcessor.getEnsembleSize(),
-        oldLocalProcessor.getLocalLearner());
-    newProcessor.getLocalLearner().resetLearning();
-    newProcessor.setLearnerOutputStream(oldLocalProcessor.getLearnerOutputStream());
-    return newProcessor;
+    return new POCAWeakLearnerProcessor(oldLocalProcessor);
   }
 
   public int getWeakLearnerId() {

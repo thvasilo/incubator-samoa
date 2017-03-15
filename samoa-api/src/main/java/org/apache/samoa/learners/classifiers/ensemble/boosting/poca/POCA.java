@@ -19,9 +19,7 @@ package org.apache.samoa.learners.classifiers.ensemble.boosting.poca;
  * #L%
  */
 
-import com.github.javacliparser.ClassOption;
-import com.github.javacliparser.Configurable;
-import com.github.javacliparser.IntOption;
+import com.github.javacliparser.*;
 import com.google.common.collect.ImmutableSet;
 import org.apache.samoa.core.Processor;
 import org.apache.samoa.instances.Instances;
@@ -33,6 +31,7 @@ import org.apache.samoa.moa.classifiers.trees.DecisionStump;
 import org.apache.samoa.topology.Stream;
 import org.apache.samoa.topology.TopologyBuilder;
 
+import java.util.Objects;
 import java.util.Set;
 
 public class POCA implements Learner, Configurable {
@@ -40,6 +39,9 @@ public class POCA implements Learner, Configurable {
 
   private ModelAggregatorProcessor modelProcessor;
   private InputProcessor inputProcessor;
+
+  public MultiChoiceOption engineOption = new MultiChoiceOption("engine", 'e', "The engine being used",
+      new String[]{"local", "threads"}, new String[]{"local", "threads"}, 0);
 
   public IntOption ensembleSizeOption = new IntOption("ensembleSize", 's',
       "The number of models in the bag.", 5, 1, Integer.MAX_VALUE);
@@ -50,20 +52,18 @@ public class POCA implements Learner, Configurable {
   @Override
   public void init(TopologyBuilder topologyBuilder, Instances dataset, int parallelism) {
     int ensembleSize = ensembleSizeOption.getValue();
+    boolean threadsEngine = Objects.equals(engineOption.getChosenLabel(), "threads");
 
     // Instantiate the input processor and add it to the ensemble
     inputProcessor = new InputProcessor();
     topologyBuilder.addProcessor(inputProcessor);
 
     // Instantiate the weak learner processors, and add them to the topology
-    // TODO: Here we have two design options:
-    // 1) Create multiple processors with parallelism == 1
-    // 2) Create one processor with parallelism == ensembleSize
-    // For now I will try the single processor approach, will have to figure out keys etc. to make this work
     Classifier baseLearner = ((org.apache.samoa.moa.classifiers.Classifier) this.baseLearnerOption.getValue()).copy();
     SimpleClassifierAdapter localLearner = new SimpleClassifierAdapter(baseLearner, dataset);
     // We add a local learner instance and the learner id to the weak learner processor
-    POCAWeakLearnerProcessor weakLearnerProcessor = new POCAWeakLearnerProcessor(ensembleSize, localLearner);
+    POCAWeakLearnerProcessor weakLearnerProcessor = new POCAWeakLearnerProcessor(
+        ensembleSize, localLearner, threadsEngine);
     // Instantiate the weak learner processor, with parallelism == ensembleSize
     topologyBuilder.addProcessor(weakLearnerProcessor, ensembleSize);
 
@@ -72,7 +72,7 @@ public class POCA implements Learner, Configurable {
     topologyBuilder.connectInputAllStream(inputStream, weakLearnerProcessor);
     inputProcessor.setInputEventStream(inputStream);
 
-    // Create the model processor that is used to aggregate the outcomes, and pass back updates of the WLs
+    // Create the model processor that is used to aggregate the outcomes, and passes back boosting updates to the WLs
     modelProcessor = new ModelAggregatorProcessor(ensembleSize);
     topologyBuilder.addProcessor(modelProcessor);
 
@@ -81,7 +81,7 @@ public class POCA implements Learner, Configurable {
     topologyBuilder.connectInputAllStream(weakLearnerStream, modelProcessor);
     weakLearnerProcessor.setLearnerOutputStream(weakLearnerStream);
 
-    // The model processor pushes updates back to the weak learners, using key distribution to route events
+    // The model processor pushes updates back to the weak learners, using shuffling to route events
     Stream modelUpdateStream = topologyBuilder.createStream(modelProcessor);
     topologyBuilder.connectInputShuffleStream(modelUpdateStream, weakLearnerProcessor);
     modelProcessor.setModelUpdateStream(modelUpdateStream);
