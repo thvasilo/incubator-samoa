@@ -32,7 +32,7 @@ public class SimpleEngine {
     SimpleTopology simpleTopology = (SimpleTopology) topology;
     simpleTopology.run();
     // runs until completion
-    System.exit(0);
+//    System.exit(0);
   }
 
 }

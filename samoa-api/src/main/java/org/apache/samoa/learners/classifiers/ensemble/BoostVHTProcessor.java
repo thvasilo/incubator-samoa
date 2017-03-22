@@ -35,6 +35,9 @@ import org.apache.samoa.topology.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.PrintStream;
 import java.util.Random;
 
 /**
@@ -93,9 +96,8 @@ public class BoostVHTProcessor implements Processor {
   
   protected double trainingWeightSeenByModel; //todo:: (Faye) when is this updated?
   //-----
-//  private long numberOfMessages = 0;
-//  private long[] nOfMsgPerEnseble ;
-  
+  //  private long numberOfMessages = 0;
+//  private long[] nOfMsgPerEnseble;
   //---for SAMME
   private int numberOfClasses;
   //---
@@ -125,7 +127,7 @@ public class BoostVHTProcessor implements Processor {
       InstanceContentEvent inEvent = (InstanceContentEvent) event;
       //todo:: (Faye) check if any precondition is needed
 //    if (inEvent.getInstanceIndex() < 0) {
-//      end learning
+////      end learning
 //      for (Stream stream : ensembleStreams)
 //        stream.put(event);
 //      return false;
@@ -147,7 +149,7 @@ public class BoostVHTProcessor implements Processor {
       for (int i = 0; i < ensembleSize; i++) {
         if (lrce.getEnsembleId() == mAPEnsemble[i].getProcessorId()){
 //          nOfMsgPerEnseble[i]++;
-//          System.out.println("-.-.-.-ensemble: " + i+ ",-.- nOfMsgPerEnseble: " + nOfMsgPerEnseble[i]);
+//          logger.info("-.-.-.-ensemble: " + i+ ",-.- nOfMsgPerEnseble: " + nOfMsgPerEnseble[i]);
           mAPEnsemble[i].process(lrce);
         }
       }
@@ -175,16 +177,14 @@ public class BoostVHTProcessor implements Processor {
           .splitConfidence(splitConfidence)
           .tieThreshold(tieThreshold)
           .gracePeriod(gracePeriod)
-          .parallelismHint(parallelismHint)
-          .timeOut(timeOut)
+          .parallelismHint(this.parallelismHint)
+          .timeOut(timeOut) //          .boostProcessor(this)
           .processorID(i) // The BoostMA processors get incremental ids
-          .boostProcessor(this) // TODO(tvas): Should prolly not be passing this, create better encapsulation
           .build();
       newProc.setAttributeStream(this.attributeStream);
       newProc.setControlStream(this.controlStream);
       mAPEnsemble[i] = newProc;
     }
-    
   }
   
   // todo:: (Faye) use also the boosting algo and the training weight for each model to compute the final result and put it to the resultStream
@@ -282,23 +282,23 @@ public class BoostVHTProcessor implements Processor {
     private double splitConfidence = 0.0000001;
     private double tieThreshold = 0.05;
     private int gracePeriod = 200;
-    private int parallelismHint = 1;
-    private int timeOut = 30;
+    private int parallelismHint = 2;
+    private int timeOut = Integer.MAX_VALUE;
 
     public Builder(Instances dataset) {
       this.dataset = dataset;
     }
 
     public Builder(BoostVHTProcessor oldProcessor) {
-      this.dataset = oldProcessor.dataset;
-      this.ensembleSize = oldProcessor.ensembleSize;
-      this.numberOfClasses = oldProcessor.numberOfClasses;
-      this.splitCriterion = oldProcessor.splitCriterion;
-      this.splitConfidence = oldProcessor.splitConfidence;
-      this.tieThreshold = oldProcessor.tieThreshold;
-      this.gracePeriod = oldProcessor.gracePeriod;
-      this.parallelismHint = oldProcessor.parallelismHint;
-      this.timeOut = oldProcessor.timeOut;
+      this.dataset = oldProcessor.getDataset();
+      this.ensembleSize = oldProcessor.getEnsembleSize();
+      this.numberOfClasses = oldProcessor.getNumberOfClasses();
+      this.splitCriterion = oldProcessor.getSplitCriterion();
+      this.splitConfidence = oldProcessor.getSplitConfidence();
+      this.tieThreshold = oldProcessor.getTieThreshold();
+      this.gracePeriod = oldProcessor.getGracePeriod();
+      this.parallelismHint = oldProcessor.getParallelismHint();
+      this.timeOut = oldProcessor.getTimeOut();
     }
 
     public Builder ensembleSize(int ensembleSize) {
@@ -374,7 +374,7 @@ public class BoostVHTProcessor implements Processor {
     this.controlStream = controlStream;
   }
 
-  public Stream getAttributeStream() {
+  public  Stream getAttributeStream() {
     return attributeStream;
   }
 
@@ -420,6 +420,10 @@ public class BoostVHTProcessor implements Processor {
   
   public void setNumberOfClasses(int numberOfClasses) {
     this.numberOfClasses = numberOfClasses;
+  }
+  
+  public Instances getDataset() {
+    return dataset;
   }
   
   @Override

@@ -111,6 +111,7 @@ public final class LocalStatisticsProcessor implements Processor {
        * ace.getClassVal(), ace.getWeight());
        */
     } else if (event instanceof ComputeContentEvent) {
+//      logger.info("_____________________ LocalStatisticsProcessor logger");
       // process ComputeContentEvent by calculating the local statistic
       // and send back the calculation results via computation result stream.
       ComputeContentEvent cce = (ComputeContentEvent) event;
@@ -171,7 +172,7 @@ public final class LocalStatisticsProcessor implements Processor {
     LocalStatisticsProcessor oldProcessor = (LocalStatisticsProcessor) p;
     LocalStatisticsProcessor newProcessor = new LocalStatisticsProcessor.Builder(oldProcessor).build();
 
-    newProcessor.setComputationResultStream(oldProcessor.computationResultStream);
+    newProcessor.setComputationResultStream(oldProcessor.getComputationResultStream());
 
     return newProcessor;
   }
@@ -211,8 +212,10 @@ public final class LocalStatisticsProcessor implements Processor {
     }
 
     public Builder(LocalStatisticsProcessor oldProcessor) {
-      this.splitCriterion = oldProcessor.splitCriterion;
-      this.binarySplit = oldProcessor.binarySplit;
+      this.splitCriterion = oldProcessor.getSplitCriterion();
+      this.binarySplit = oldProcessor.isBinarySplit();
+      this.nominalClassObserver = oldProcessor.getNominalClassObserver();
+      this.numericClassObserver = oldProcessor.getNumericClassObserver();
     }
 
     public Builder splitCriterion(SplitCriterion splitCriterion) {
@@ -239,5 +242,24 @@ public final class LocalStatisticsProcessor implements Processor {
       return new LocalStatisticsProcessor(this);
     }
   }
-
+  
+  public SplitCriterion getSplitCriterion() {
+    return splitCriterion;
+  }
+  
+  public boolean isBinarySplit() {
+    return binarySplit;
+  }
+  
+  public AttributeClassObserver getNominalClassObserver() {
+    return nominalClassObserver;
+  }
+  
+  public AttributeClassObserver getNumericClassObserver() {
+    return numericClassObserver;
+  }
+  
+  public Stream getComputationResultStream() {
+    return computationResultStream;
+  }
 }

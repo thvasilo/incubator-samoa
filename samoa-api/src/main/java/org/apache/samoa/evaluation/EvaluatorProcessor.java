@@ -24,6 +24,8 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.PrintStream;
+import java.lang.management.ManagementFactory;
+import java.lang.management.ThreadMXBean;
 import java.util.Collections;
 import java.util.List;
 import java.util.Vector;
@@ -53,12 +55,23 @@ public class EvaluatorProcessor implements Processor {
   private final PerformanceEvaluator evaluator;
   private final int samplingFrequency;
   private final File dumpFile;
-  private transient PrintStream immediateResultStream = null;
-  private transient boolean firstDump = true;
+  private PrintStream immediateResultStream = null;
+//  private PrintStream metadataStream = null;//
+  private boolean firstDump = true;
 
   private long totalCount = 0;
   private long experimentStart = 0;
 
+
+  
+  long sampleDuration = 0;
+  private  File metrics;
+  long sampleStartCPUTime = 0;
+  long sampleEndCPUTime = 0;
+//  long sampleCPUTime =0;
+//  long startCPUTime = 0;
+//  ThreadMXBean threadMXBean = ManagementFactory.getThreadMXBean();
+  
   private long sampleStart = 0;
 
   private LearningCurve learningCurve;
@@ -77,9 +90,12 @@ public class EvaluatorProcessor implements Processor {
 
     if ((totalCount > 0) && (totalCount % samplingFrequency) == 0) {
       long sampleEnd = System.nanoTime();
-      long sampleDuration = TimeUnit.SECONDS.convert(sampleEnd - sampleStart, TimeUnit.NANOSECONDS);
+      sampleDuration = TimeUnit.SECONDS.convert(sampleEnd - sampleStart, TimeUnit.NANOSECONDS);
       sampleStart = sampleEnd;
-
+//      sampleEndCPUTime = threadMXBean.getCurrentThreadCpuTime();
+//      sampleStartCPUTime = sampleEndCPUTime;
+      
+//      sampleCPUTime = sampleEndCPUTime - sampleStartCPUTime;
       logger.info("{} seconds for {} instances", sampleDuration, samplingFrequency);
       this.addMeasurement();
     }
@@ -93,8 +109,9 @@ public class EvaluatorProcessor implements Processor {
     totalCount += 1;
 
     if (totalCount == 1) {
+//      startCPUTime = threadMXBean.getCurrentThreadCpuTime();
       sampleStart = System.nanoTime();
-      experimentStart = sampleStart;
+//      experimentStart = sampleStart;
     }
 
     return false;
@@ -104,7 +121,16 @@ public class EvaluatorProcessor implements Processor {
   public void onCreate(int id) {
     this.id = id;
     this.learningCurve = new LearningCurve(ORDERING_MEASUREMENT_NAME);
-
+  
+//    try {
+//      String datafile = "/Users/fobeligi/Documents/GBDT/experiments-output/classification/classification";
+//      metrics = new File(datafile+"_evaluatorMetrics.csv");
+//      this.metadataStream = new PrintStream(
+//                new FileOutputStream(metrics), true);
+//    } catch (FileNotFoundException e) {
+//      e.printStackTrace();
+//    }
+  
     if (this.dumpFile != null) {
       try {
         if (dumpFile.exists()) {
@@ -171,11 +197,14 @@ public class EvaluatorProcessor implements Processor {
     if (immediateResultStream != null) {
       if (firstDump) {
         immediateResultStream.println(learningCurve.headerToString());
+//        metadataStream.println("#Instances classified, Experiment's Wall clock, Experiment's CPU time ");
         firstDump = false;
       }
 
       immediateResultStream.println(learningCurve.entryToString(learningCurve.numEntries() - 1));
       immediateResultStream.flush();
+  
+//      metadataStream.println(totalCount + "," +sampleDuration+ "," + sampleCPUTime);
     }
   }
 
@@ -188,14 +217,21 @@ public class EvaluatorProcessor implements Processor {
 
     long experimentEnd = System.nanoTime();
     long totalExperimentTime = TimeUnit.SECONDS.convert(experimentEnd - experimentStart, TimeUnit.NANOSECONDS);
+//    long endCPUTime = threadMXBean.getCurrentThreadCpuTime();
+//    long totalCPUTime = endCPUTime-startCPUTime;
     logger.info("total evaluation time: {} seconds for {} instances", totalExperimentTime, totalCount);
+//    logger.info("total CPU time: {} seconds for {} instances", totalCPUTime, totalCount);
 
     if (immediateResultStream != null) {
       immediateResultStream.println("# COMPLETED");
       immediateResultStream.flush();
     }
-    // logger.info("average throughput rate: {} instances/seconds",
-    // (totalCount/totalExperimentTime));
+//    if (metadataStream != null) {
+//      metadataStream.println(totalCount + "," +totalExperimentTime+ "," + totalCPUTime);
+//      metadataStream.flush();
+//    }
+     logger.info("average throughput rate: {} instances/seconds",
+     (totalCount/totalExperimentTime));
   }
 
   public static class Builder {

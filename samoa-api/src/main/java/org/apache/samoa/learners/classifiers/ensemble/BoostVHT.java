@@ -34,7 +34,6 @@ import org.apache.samoa.core.Processor;
 import org.apache.samoa.instances.Instances;
 import org.apache.samoa.learners.ClassificationLearner;
 import org.apache.samoa.learners.Learner;
-import org.apache.samoa.learners.classifiers.SingleClassifier;
 import org.apache.samoa.learners.classifiers.trees.LocalStatisticsProcessor;
 import org.apache.samoa.learners.classifiers.trees.VerticalHoeffdingTree;
 import org.apache.samoa.moa.classifiers.core.attributeclassobservers.AttributeClassObserver;
@@ -43,6 +42,8 @@ import org.apache.samoa.moa.classifiers.core.attributeclassobservers.NumericAttr
 import org.apache.samoa.moa.classifiers.core.splitcriteria.SplitCriterion;
 import org.apache.samoa.topology.Stream;
 import org.apache.samoa.topology.TopologyBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Set;
 
@@ -53,8 +54,10 @@ public class BoostVHT implements ClassificationLearner, Configurable {
 
   /** The Constant serialVersionUID. */
   private static final long serialVersionUID = -7523211543185584536L;
-
-
+  
+  private static final Logger logger =
+          LoggerFactory.getLogger(BoostVHT.class);
+  
   /** The base learner option. */ //TODO(tvas): Not being used currently, adding it to ease the automated Python scripts
   public ClassOption baseLearnerOption = new ClassOption("baseLearner", 'l',
       "Classifier to train.", Learner.class, VerticalHoeffdingTree.class.getName());
@@ -183,6 +186,7 @@ public class BoostVHT implements ClassificationLearner, Configurable {
     boostVHTProcessor.setAttributeStream(attributeStream);
     boostVHTProcessor.setControlStream(controlStream);
 
+    logger.info("--------- Topology is set!!!");
   }
 
   /** The topologyBuilder. */

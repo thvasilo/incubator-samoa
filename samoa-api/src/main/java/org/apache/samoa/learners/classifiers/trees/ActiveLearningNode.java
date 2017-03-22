@@ -152,8 +152,8 @@ public final class ActiveLearningNode extends LearningNode {
       map.sendToControlStream(cce);
     } else if(modelAggrProc instanceof BoostMAProcessor) {
       cce.setEnsembleId(this.ensembleId); //faye boostVHT
-      BoostMAProcessor map = (BoostMAProcessor)modelAggrProc;
-      map.sendToControlStream(cce);
+      BoostMAProcessor bmap = (BoostMAProcessor)modelAggrProc;
+      bmap.sendToControlStream(cce);
     }
   }
 

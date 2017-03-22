@@ -47,6 +47,10 @@ import org.apache.samoa.topology.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.PrintStream;
 import java.io.Serializable;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -97,7 +101,7 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
   private BlockingQueue<Long> timedOutSplittingNodes;
 
   // available streams
-  private Stream resultStream;
+//  private Stream resultStream;
   private Stream attributeStream;
   private Stream controlStream;
 
@@ -110,11 +114,18 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
   private final int parallelismHint;
   private final long timeOut;
   
-  //
+  private long instancesSeenAtModelUpdate ;
+ 
+  private File metrics;
+  private String datapath = "/Users/fobeligi/Documents/GBDT/experiments-output/classification/classification";
+  private PrintStream metadataStream = null;
+  private boolean firstEvent = true;
+  
+  
   private double weightSeenByModel = 0.0;
   
   //the "parent" processor that boosting takes place. We need it for the streams
-  private final BoostVHTProcessor boostProc;
+//  private final BoostVHTProcessor boostProc;
 
   // private constructor based on Builder pattern
   private BoostMAProcessor(Builder builder) {
@@ -126,11 +137,12 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
     this.gracePeriod = builder.gracePeriod;
     this.parallelismHint = builder.parallelismHint;
     this.timeOut = builder.timeOut;
-    this.boostProc = builder.boostProc;
+//    this.boostProc = builder.boostProc;
 
 
     InstancesHeader ih = new InstancesHeader(dataset);
     this.setModelContext(ih);
+    
     // These used to happen in onCreate which no longer gets called.
 
     this.activeLeafNodeCount = 0;
@@ -141,6 +153,8 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
     this.splittingNodes = new ConcurrentHashMap<>();
     this.timedOutSplittingNodes = new LinkedBlockingQueue<>();
     this.splitId = 0;
+    
+    this.instancesSeenAtModelUpdate = 0;
 
     // Executor for scheduling time-out threads
     this.executor = Executors.newScheduledThreadPool(8);
@@ -164,6 +178,20 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
 
     // Receive a new instance from source
     if (event instanceof InstanceContentEvent) {
+      instancesSeenAtModelUpdate++;//
+      
+      if (firstEvent) {
+        try {
+          metrics = new File(datapath+"_model_"+this.getProcessorId()+"_updates.csv");
+          metadataStream = new PrintStream(
+                  new FileOutputStream(metrics), true);
+          metadataStream.println("Instances seen,model id,splitId, active Leaf Nodes,decision Nodes" );
+        } catch (Exception e) {
+          e.printStackTrace();
+        }
+        firstEvent=false;
+      }
+      
       InstanceContentEvent instanceEvent = (InstanceContentEvent) event;
       this.processInstanceContentEvent(instanceEvent);
       // Send information to local-statistic PI
@@ -201,6 +229,7 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
       if (splittingNodeInfo != null) { // if null, that means
         // activeLearningNode has been
         // removed by timeout thread
+//        logger.info("----------------EnsembleId in LRCE: " + lrce.getEnsembleId()+", ProcessorId: " + this.getProcessorId());
         ActiveLearningNode activeLearningNode = splittingNodeInfo.activeLearningNode;
         
         activeLearningNode.addDistributedSuggestions(lrce.getBestSuggestion(), lrce.getSecondBestSuggestion());
@@ -219,7 +248,7 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
 
   @Override
   public void onCreate(int id) {
-
+    this.resetLearning();
   }
 
   @Override
@@ -227,9 +256,9 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
     BoostMAProcessor oldProcessor = (BoostMAProcessor) p;
     BoostMAProcessor newProcessor = new BoostMAProcessor.Builder(oldProcessor).build();
 
-//    newProcessor.setResultStream(oldProcessor.resultStream);
-//    newProcessor.setAttributeStream(oldProcessor.attributeStream);
-//    newProcessor.setControlStream(oldProcessor.controlStream);
+    newProcessor.setAttributeStream(oldProcessor.getAttributeStream());
+    newProcessor.setControlStream(oldProcessor.getControlStream());
+    
     return newProcessor;
   }
 
@@ -245,9 +274,7 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
     return sb.toString();
   }
 
-  public void setResultStream(Stream resultStream) {
-    this.resultStream = resultStream;
-  }
+//getres
 
   public void setAttributeStream(Stream attributeStream) {
     this.attributeStream = attributeStream;
@@ -258,11 +285,12 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
   }
 
   //todo:: is there any reason to synchronize these two methods?
-  void sendToAttributeStream(ContentEvent event) {
+  public void sendToAttributeStream(ContentEvent event) {
     this.attributeStream.put(event);
   }
 
   public void sendToControlStream(ContentEvent event) {
+//    this.boostProc.getControlStream().put(event);
     this.controlStream.put(event);
   }
   
@@ -513,6 +541,11 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
         } else {
           parent.setChild(parentBranch, newSplit);
         }
+        //metrics = ("Instances seen,model id,splitId, active Leaf Nodes,decision Nodes")
+        String metricsData = instancesSeenAtModelUpdate + "," + this.processorId+"," + this.splitId +"," + this.activeLeafNodeCount + "," + this.decisionNodeCount;
+        this.metadataStream.println(metricsData);
+        setInstancesSeenAtModelUpdate(0) ;
+        //---
       }
       // TODO: add check on the model's memory size
     }
@@ -653,7 +686,7 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
     private double tieThreshold = 0.05;
     private int gracePeriod = 200;
     private int parallelismHint = 1;
-    private long timeOut = 30;
+    private long timeOut = Integer.MAX_VALUE;
     private BoostVHTProcessor boostProc = null;
   
     public Builder(Instances dataset) {
@@ -661,15 +694,15 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
     }
 
     public Builder(BoostMAProcessor oldProcessor) {
-      this.dataset = oldProcessor.dataset;
-      this.processorID = oldProcessor.processorId;
-      this.splitCriterion = oldProcessor.splitCriterion;
-      this.splitConfidence = oldProcessor.splitConfidence;
-      this.tieThreshold = oldProcessor.tieThreshold;
-      this.gracePeriod = oldProcessor.gracePeriod;
-      this.parallelismHint = oldProcessor.parallelismHint;
-      this.timeOut = oldProcessor.timeOut;
-      this.boostProc = oldProcessor.boostProc;
+      this.dataset = oldProcessor.getDataset();
+      this.processorID = oldProcessor.getProcessorId();
+      this.splitCriterion = oldProcessor.getSplitCriterion();
+      this.splitConfidence = oldProcessor.getSplitConfidence();
+      this.tieThreshold = oldProcessor.getTieThreshold();
+      this.gracePeriod = oldProcessor.getGracePeriod();
+      this.parallelismHint = oldProcessor.getParallelismHint();
+      this.timeOut = oldProcessor.getTimeOut();
+//      this.boostProc = oldProcessor.getBoostProc();
     }
   
     public Builder splitCriterion(SplitCriterion splitCriterion) {
@@ -702,10 +735,10 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
       return this;
     }
     
-    public Builder boostProcessor(BoostVHTProcessor boostProc){
-      this.boostProc = boostProc;
-      return this;
-    }
+//    public Builder boostProcessor(BoostVHTProcessor boostProc){
+//      this.boostProc = boostProc;
+//      return this;
+//    }
 
     public Builder processorID(int processorID) {
       this.processorID = processorID;
@@ -719,11 +752,56 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
 
   //added for boostVHT
   
+  
+  public Instances getDataset() {
+    return dataset;
+  }
+  
+  public Stream getAttributeStream() {
+    return attributeStream;
+  }
+  
+  public Stream getControlStream() {
+    return controlStream;
+  }
+  
+  public SplitCriterion getSplitCriterion() {
+    return splitCriterion;
+  }
+  
+  public double getSplitConfidence() {
+    return splitConfidence;
+  }
+  
+  public double getTieThreshold() {
+    return tieThreshold;
+  }
+  
+  public int getGracePeriod() {
+    return gracePeriod;
+  }
+  
+  public int getParallelismHint() {
+    return parallelismHint;
+  }
+  
+  public long getTimeOut() {
+    return timeOut;
+  }
+  
+//  public BoostVHTProcessor getBoostProc() {
+//    return boostProc;
+//  }
+  
   public double getWeightSeenByModel() {
     return weightSeenByModel;
   }
   
   public int getProcessorId() {
     return processorId;
+  }
+  
+  public void setInstancesSeenAtModelUpdate(long instancesSeenAtModelUpdate) {
+    this.instancesSeenAtModelUpdate = instancesSeenAtModelUpdate;
   }
 }
