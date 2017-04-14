@@ -25,10 +25,8 @@ import org.apache.samoa.core.Processor;
 import org.apache.samoa.instances.Instance;
 import org.apache.samoa.instances.Instances;
 import org.apache.samoa.instances.InstancesHeader;
-import org.apache.samoa.learners.InstanceContent;
 import org.apache.samoa.learners.InstanceContentEvent;
 import org.apache.samoa.learners.InstancesContentEvent;
-import org.apache.samoa.learners.ResultContentEvent;
 import org.apache.samoa.learners.classifiers.ModelAggregator;
 import org.apache.samoa.learners.classifiers.trees.ActiveLearningNode;
 import org.apache.samoa.learners.classifiers.trees.AttributeBatchContentEvent;
@@ -36,7 +34,6 @@ import org.apache.samoa.learners.classifiers.trees.FoundNode;
 import org.apache.samoa.learners.classifiers.trees.InactiveLearningNode;
 import org.apache.samoa.learners.classifiers.trees.LearningNode;
 import org.apache.samoa.learners.classifiers.trees.LocalResultContentEvent;
-import org.apache.samoa.learners.classifiers.trees.ModelAggregatorProcessor;
 import org.apache.samoa.learners.classifiers.trees.Node;
 import org.apache.samoa.learners.classifiers.trees.SplitNode;
 import org.apache.samoa.moa.classifiers.core.AttributeSplitSuggestion;
@@ -48,7 +45,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.PrintStream;
 import java.io.Serializable;
@@ -117,7 +113,7 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
   private long instancesSeenAtModelUpdate ;
  
   private File metrics;
-  private String datapath = "/Users/fobeligi/Documents/GBDT/experiments-output/classification/classification";
+  private String datapath = "/Users/fobeligi/Documents/GBDT/experiments-output-310317/forestCoverType/forestCoverType";
   private PrintStream metadataStream = null;
   private boolean firstEvent = true;
   
@@ -154,9 +150,7 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
     this.timedOutSplittingNodes = new LinkedBlockingQueue<>();
     this.splitId = 0;
     
-    this.instancesSeenAtModelUpdate = 0;
-
-    // Executor for scheduling time-out threads
+// Executor for scheduling time-out threads
     this.executor = Executors.newScheduledThreadPool(8);
   }
 
@@ -170,7 +164,7 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
       SplittingNodeInfo splittingNode = splittingNodes.get(timedOutSplitId);
       if (splittingNode != null) {
         this.splittingNodes.remove(timedOutSplitId);
-        this.continueAttemptToSplit(splittingNode.activeLearningNode, splittingNode.foundNode);
+        this.continueAttemptToSplit(splittingNode.activeLearningNode, splittingNode.foundNode,timedOutSplitId);
 
       }
 
@@ -180,6 +174,7 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
     if (event instanceof InstanceContentEvent) {
       instancesSeenAtModelUpdate++;//
       
+      //creating the model_updates file for test purposes.It will be deleted later
       if (firstEvent) {
         try {
           metrics = new File(datapath+"_model_"+this.getProcessorId()+"_updates.csv");
@@ -237,7 +232,7 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
         if (activeLearningNode.isAllSuggestionsCollected()) {
           splittingNodeInfo.scheduledFuture.cancel(false);
           this.splittingNodes.remove(lrceSplitId);
-          this.continueAttemptToSplit(activeLearningNode, splittingNodeInfo.foundNode);
+          this.continueAttemptToSplit(activeLearningNode, splittingNodeInfo.foundNode,lrceSplitId);
         }
       }
     }
@@ -273,9 +268,7 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
     sb.append("Growth allowed: ").append(growthAllowed);
     return sb.toString();
   }
-
-//getres
-
+  
   public void setAttributeStream(Stream attributeStream) {
     this.attributeStream = attributeStream;
   }
@@ -485,7 +478,7 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
    * @param foundNode
    *          The data structure to represents the filtering of the instance using the tree model.
    */
-  private void continueAttemptToSplit(ActiveLearningNode activeLearningNode, FoundNode foundNode) {
+  private void continueAttemptToSplit(ActiveLearningNode activeLearningNode, FoundNode foundNode,Long splitId) {
     AttributeSplitSuggestion bestSuggestion = activeLearningNode.getDistributedBestSuggestion();
     AttributeSplitSuggestion secondBestSuggestion = activeLearningNode.getDistributedSecondBestSuggestion();
 
@@ -542,9 +535,8 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
           parent.setChild(parentBranch, newSplit);
         }
         //metrics = ("Instances seen,model id,splitId, active Leaf Nodes,decision Nodes")
-        String metricsData = instancesSeenAtModelUpdate + "," + this.processorId+"," + this.splitId +"," + this.activeLeafNodeCount + "," + this.decisionNodeCount;
+        String metricsData = this.instancesSeenAtModelUpdate + "," + this.processorId+"," + splitId +"," + this.activeLeafNodeCount + "," + this.decisionNodeCount;
         this.metadataStream.println(metricsData);
-        setInstancesSeenAtModelUpdate(0) ;
         //---
       }
       // TODO: add check on the model's memory size
@@ -799,9 +791,5 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
   
   public int getProcessorId() {
     return processorId;
-  }
-  
-  public void setInstancesSeenAtModelUpdate(long instancesSeenAtModelUpdate) {
-    this.instancesSeenAtModelUpdate = instancesSeenAtModelUpdate;
   }
 }

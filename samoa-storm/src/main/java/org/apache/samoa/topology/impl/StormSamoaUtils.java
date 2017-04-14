@@ -90,11 +90,11 @@ public class StormSamoaUtils {
   
     //------- faye
     try {
-      String datapath = "/Users/fobeligi/Documents/GBDT/experiments-output/classification/";
+      String datapath = "/Users/fobeligi/Documents/GBDT/experiments-output-310317/forestCoverType/";
       File metrics = new File(datapath+dataSet+"_commands.csv");
       PrintStream metadataStream = new PrintStream(new FileOutputStream(metrics), true);
       metadataStream.println("command,dataset,framework" );
-      metadataStream.println(command + ","+ dataSet+ ",SAMOA");
+      metadataStream.println(command + ","+ dataSet+ ",STORM");
     } catch (Exception e) {
       e.printStackTrace();
     }

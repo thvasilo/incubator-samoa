@@ -177,16 +177,14 @@ public class BoostVHT implements ClassificationLearner, Configurable {
     computeStream = this.topologyBuilder.createStream(locStatProcessor);
     locStatProcessor.setComputationResultStream(computeStream);
     this.topologyBuilder.connectInputAllStream(computeStream, boostVHTProcessor);
-    
-    
-    resultStream = this.topologyBuilder.createStream(boostVHTProcessor);  //prediction is computed in boostVHTProcessor
+  
+    //prediction is computed in boostVHTProcessor
+    resultStream = this.topologyBuilder.createStream(boostVHTProcessor);
     
     //set the out streams of the BoostVHTProcessor
     boostVHTProcessor.setResultStream(resultStream);
     boostVHTProcessor.setAttributeStream(attributeStream);
     boostVHTProcessor.setControlStream(controlStream);
-
-    logger.info("--------- Topology is set!!!");
   }
 
   /** The topologyBuilder. */

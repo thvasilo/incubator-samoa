@@ -248,11 +248,13 @@ public class BoostVHTProcessor implements Processor {
   
   private double getEnsembleMemberWeight(int i) {
     double em = this.swms[i] / (this.scms[i] + this.swms[i]);
-    if ((em == 0.0) || (em > 0.5)) {
+//    if ((em == 0.0) || (em > 0.5)) {
+    if ((em == 0.0) || (em > (1.0 - 1.0/this.numberOfClasses))) { //for SAMME
       return 0.0;
     }
     double Bm = em / (1.0 - em);
-    return Math.log(1.0 / Bm);
+//    return Math.log(1.0 / Bm);
+    return Math.log(1.0 / Bm ) + Math.log(this.numberOfClasses - 1); //for SAMME
   }
   
   /**
@@ -275,14 +277,14 @@ public class BoostVHTProcessor implements Processor {
     // BoostVHT processor parameters
     private final Instances dataset;
     private int ensembleSize = 10;
-    private int numberOfClasses;
+    private int numberOfClasses = 2;
 
     // BoostMAProcessor parameters
     private SplitCriterion splitCriterion = new InfoGainSplitCriterion();
     private double splitConfidence = 0.0000001;
     private double tieThreshold = 0.05;
     private int gracePeriod = 200;
-    private int parallelismHint = 2;
+    private int parallelismHint = 1;
     private int timeOut = Integer.MAX_VALUE;
 
     public Builder(Instances dataset) {

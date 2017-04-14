@@ -54,12 +54,10 @@ public class LocalDoTask {
   private static final String STATUS_UPDATE_FREQ_MSG = "Wait time in milliseconds between status updates.";
   private static final Logger logger = LoggerFactory.getLogger(LocalDoTask.class);
 
-//  public static String command = "";
-//  public static String dataSet = "";
-//  private static transient File metrics;
-//  private static transient PrintStream metadataStream = null;
-//  private static long expStartCPUTime = 0;
-//  private static long expEndCPUTime = 0;
+  public static String command = "";
+  public static String dataSet = "";
+  private static transient File metrics;
+  private static transient PrintStream metadataStream = null;
 //
   /**
    * The main method.
@@ -84,25 +82,25 @@ public class LocalDoTask {
 
     StringBuilder cliString = new StringBuilder();
     for (String arg : args) {
-//      if (arg.endsWith(".arff)")) {
-//        dataSet = (arg.substring(arg.lastIndexOf("/") + 1));
-//        dataSet = dataSet.substring(0, dataSet.length()-1);
-//      }
+      if (arg.endsWith(".arff)")) {
+        dataSet = (arg.substring(arg.lastIndexOf("/") + 1));
+        dataSet = dataSet.substring(0, dataSet.length()-1);
+      }
       cliString.append(" ").append(arg);
     }
     logger.debug("Command line string = {}", cliString.toString());
-//    command = cliString.toString();
+    command = cliString.toString();
     System.out.println("Command line string = " + cliString.toString());
-//    try {
-//      metrics = new File("metrics.csv");
-//      metadataStream = new PrintStream(
-//              new FileOutputStream(metrics), true);
-//      metadataStream.println("Command,dataset,framework,Experiment duration" + command);
-//      metadataStream.print(command + ","+ dataSet+ ",SAMOA,");
-////      metadataStream.println("framework: SAMOA");
-//    } catch (FileNotFoundException e) {
-//      e.printStackTrace();
-//    }
+    try {
+      String datapath = "/Users/fobeligi/Documents/GBDT/experiments-output-310317/forestCoverType/";
+      File metrics = new File(datapath+dataSet+"_commands.csv");
+      metadataStream = new PrintStream(
+              new FileOutputStream(metrics), true);
+      metadataStream.println("Command,dataset,framework,Experiment duration" + command);
+      metadataStream.print(command + ","+ dataSet+ ",LOCAL");
+    } catch (FileNotFoundException e) {
+      e.printStackTrace();
+    }
     
     
     Task task;
@@ -116,20 +114,7 @@ public class LocalDoTask {
     }
     task.setFactory(new SimpleComponentFactory());
     
-//    ThreadMXBean threadMXBean = ManagementFactory.getThreadMXBean();
-//    expStartCPUTime = System.nanoTime();
-    
     task.init();
-  
-//    expEndCPUTime = System.nanoTime();
-//    double elapsedTime = (expEndCPUTime-expStartCPUTime)/ 1000000000.0;
-  
-//    if (metadataStream != null) {
-//      metadataStream.println(elapsedTime);
-//      metadataStream.flush();
-//    }
-//    System.out.println("--1----metadataStream state: "+metadataStream.toString() +"and elapsed time: " +elapsedTime);
-    
     SimpleEngine.submitTopology(task.getTopology());
   }
 }
