@@ -34,6 +34,8 @@ import org.apache.samoa.core.Processor;
 import org.apache.samoa.instances.Instances;
 import org.apache.samoa.learners.ClassificationLearner;
 import org.apache.samoa.learners.Learner;
+import org.apache.samoa.learners.classifiers.trees.ActiveLearningNode;
+import org.apache.samoa.learners.classifiers.trees.ActiveLearningNode.SplittingOption;
 import org.apache.samoa.learners.classifiers.trees.LocalStatisticsProcessor;
 import org.apache.samoa.learners.classifiers.trees.VerticalHoeffdingTree;
 import org.apache.samoa.moa.classifiers.core.attributeclassobservers.AttributeClassObserver;
@@ -92,6 +94,9 @@ public class BoostVHT implements ClassificationLearner, Configurable {
 
   public FlagOption binarySplitsOption = new FlagOption("binarySplits", 'b',
           "Only allow binary splits.");
+
+  public FlagOption splittingOption = new FlagOption("keepInstanceWhileSplitting",'q',
+      "Keep instance while splitting (without buffer)");
   
     /** The ensemble size option. */
   public IntOption ensembleSizeOption = new IntOption("ensembleSize", 's',
@@ -146,6 +151,7 @@ public class BoostVHT implements ClassificationLearner, Configurable {
           .gracePeriod(this.gracePeriodOption.getValue())
           .parallelismHint(this.ensembleSizeOption.getValue())
           .timeOut(this.timeOutOption.getValue())
+          .splittingOption(this.splittingOption.isSet() ? SplittingOption.KEEP_WO_BUFFER: SplittingOption.THROW_AWAY)
           .build();
     } catch (Exception e) {
       e.printStackTrace();

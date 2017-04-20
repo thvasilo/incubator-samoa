@@ -594,7 +594,7 @@ public class ModelAggregatorProcessor implements ModelAggregator, Processor {
   private LearningNode newLearningNode(double[] initialClassObservations, int parallelismHint) {
     // for VHT optimization, we need to dynamically instantiate the appropriate
     // ActiveLearningNode
-    return new ActiveLearningNode(initialClassObservations, parallelismHint);
+    return new ActiveLearningNode(initialClassObservations, parallelismHint, ActiveLearningNode.SplittingOption.THROW_AWAY);
   }
 
   /**

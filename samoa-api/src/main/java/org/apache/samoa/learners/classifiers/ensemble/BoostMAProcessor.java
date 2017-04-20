@@ -29,6 +29,7 @@ import org.apache.samoa.learners.InstanceContentEvent;
 import org.apache.samoa.learners.InstancesContentEvent;
 import org.apache.samoa.learners.classifiers.ModelAggregator;
 import org.apache.samoa.learners.classifiers.trees.ActiveLearningNode;
+import org.apache.samoa.learners.classifiers.trees.ActiveLearningNode.SplittingOption;
 import org.apache.samoa.learners.classifiers.trees.AttributeBatchContentEvent;
 import org.apache.samoa.learners.classifiers.trees.FoundNode;
 import org.apache.samoa.learners.classifiers.trees.InactiveLearningNode;
@@ -88,6 +89,7 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
   private int inactiveLeafNodeCount;
   private int decisionNodeCount;
   private boolean growthAllowed;
+  private final SplittingOption splittingOption;
 
   private final Instances dataset;
 
@@ -113,7 +115,7 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
   private long instancesSeenAtModelUpdate ;
  
   private File metrics;
-  private String datapath = "/Users/fobeligi/Documents/GBDT/experiments-output-310317/forestCoverType/forestCoverType";
+  private String datapath = "/home/tvas/output/covtype";
   private PrintStream metadataStream = null;
   private boolean firstEvent = true;
   
@@ -133,6 +135,7 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
     this.gracePeriod = builder.gracePeriod;
     this.parallelismHint = builder.parallelismHint;
     this.timeOut = builder.timeOut;
+    this.splittingOption = builder.splittingOption;
 //    this.boostProc = builder.boostProc;
 
 
@@ -576,7 +579,7 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
   private LearningNode newLearningNode(double[] initialClassObservations, int parallelismHint) {
     // for VHT optimization, we need to dynamically instantiate the appropriate
     // ActiveLearningNode
-    ActiveLearningNode newNode = new ActiveLearningNode(initialClassObservations, parallelismHint);
+    ActiveLearningNode newNode = new ActiveLearningNode(initialClassObservations, parallelismHint, this.splittingOption);
     newNode.setEnsembleId(this.processorId);
     return newNode;
   }
@@ -679,6 +682,7 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
     private int gracePeriod = 200;
     private int parallelismHint = 1;
     private long timeOut = Integer.MAX_VALUE;
+    private SplittingOption splittingOption;
     private BoostVHTProcessor boostProc = null;
   
     public Builder(Instances dataset) {
@@ -694,6 +698,7 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
       this.gracePeriod = oldProcessor.getGracePeriod();
       this.parallelismHint = oldProcessor.getParallelismHint();
       this.timeOut = oldProcessor.getTimeOut();
+      this.splittingOption = oldProcessor.splittingOption;
 //      this.boostProc = oldProcessor.getBoostProc();
     }
   
@@ -719,6 +724,11 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
   
     public Builder parallelismHint(int parallelismHint) {
       this.parallelismHint = parallelismHint;
+      return this;
+    }
+
+    public Builder splittingOption(SplittingOption splittingOption) {
+      this.splittingOption = splittingOption;
       return this;
     }
   

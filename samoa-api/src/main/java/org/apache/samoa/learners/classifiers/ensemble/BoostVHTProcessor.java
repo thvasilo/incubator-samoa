@@ -26,6 +26,7 @@ import org.apache.samoa.instances.Instance;
 import org.apache.samoa.instances.Instances;
 import org.apache.samoa.learners.InstanceContentEvent;
 import org.apache.samoa.learners.ResultContentEvent;
+import org.apache.samoa.learners.classifiers.trees.ActiveLearningNode;
 import org.apache.samoa.learners.classifiers.trees.LocalResultContentEvent;
 import org.apache.samoa.moa.classifiers.core.splitcriteria.InfoGainSplitCriterion;
 import org.apache.samoa.moa.classifiers.core.splitcriteria.SplitCriterion;
@@ -60,6 +61,8 @@ public class BoostVHTProcessor implements Processor {
   private int parallelismHint;
   
   private int timeOut;
+
+  private ActiveLearningNode.SplittingOption splittingOption;
   
   //------
   
@@ -113,6 +116,7 @@ public class BoostVHTProcessor implements Processor {
     this.gracePeriod = builder.gracePeriod;
     this.parallelismHint = builder.parallelismHint;
     this.timeOut = builder.timeOut;
+    this.splittingOption = builder.splittingOption;
   }
 
   /**
@@ -180,6 +184,7 @@ public class BoostVHTProcessor implements Processor {
           .parallelismHint(this.parallelismHint)
           .timeOut(timeOut) //          .boostProcessor(this)
           .processorID(i) // The BoostMA processors get incremental ids
+          .splittingOption(splittingOption)
           .build();
       newProc.setAttributeStream(this.attributeStream);
       newProc.setControlStream(this.controlStream);
@@ -286,6 +291,7 @@ public class BoostVHTProcessor implements Processor {
     private int gracePeriod = 200;
     private int parallelismHint = 1;
     private int timeOut = Integer.MAX_VALUE;
+    private ActiveLearningNode.SplittingOption splittingOption;
 
     public Builder(Instances dataset) {
       this.dataset = dataset;
@@ -301,6 +307,7 @@ public class BoostVHTProcessor implements Processor {
       this.gracePeriod = oldProcessor.getGracePeriod();
       this.parallelismHint = oldProcessor.getParallelismHint();
       this.timeOut = oldProcessor.getTimeOut();
+      this.splittingOption = oldProcessor.splittingOption;
     }
 
     public Builder ensembleSize(int ensembleSize) {
@@ -340,6 +347,11 @@ public class BoostVHTProcessor implements Processor {
 
     public Builder timeOut(int timeOut) {
       this.timeOut = timeOut;
+      return this;
+    }
+
+    public Builder splittingOption(ActiveLearningNode.SplittingOption splittingOption) {
+      this.splittingOption = splittingOption;
       return this;
     }
 
