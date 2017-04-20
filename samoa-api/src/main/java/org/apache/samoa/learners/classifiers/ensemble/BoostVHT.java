@@ -34,7 +34,6 @@ import org.apache.samoa.core.Processor;
 import org.apache.samoa.instances.Instances;
 import org.apache.samoa.learners.ClassificationLearner;
 import org.apache.samoa.learners.Learner;
-import org.apache.samoa.learners.classifiers.trees.ActiveLearningNode;
 import org.apache.samoa.learners.classifiers.trees.ActiveLearningNode.SplittingOption;
 import org.apache.samoa.learners.classifiers.trees.LocalStatisticsProcessor;
 import org.apache.samoa.learners.classifiers.trees.VerticalHoeffdingTree;
@@ -97,6 +96,10 @@ public class BoostVHT implements ClassificationLearner, Configurable {
 
   public FlagOption splittingOption = new FlagOption("keepInstanceWhileSplitting",'q',
       "Keep instance while splitting (without buffer)");
+
+  public IntOption maxBufferSizeOption = new IntOption("maxBufferSizeWhileSplitting",'z',
+      "Maximum buffer size while splitting, use in conjuction with 'k' option. Size 0 means we don't use buffer while splitting",
+      0, 0, Integer.MAX_VALUE);
   
     /** The ensemble size option. */
   public IntOption ensembleSizeOption = new IntOption("ensembleSize", 's',
@@ -151,7 +154,8 @@ public class BoostVHT implements ClassificationLearner, Configurable {
           .gracePeriod(this.gracePeriodOption.getValue())
           .parallelismHint(this.ensembleSizeOption.getValue())
           .timeOut(this.timeOutOption.getValue())
-          .splittingOption(this.splittingOption.isSet() ? SplittingOption.KEEP_WO_BUFFER: SplittingOption.THROW_AWAY)
+          .splittingOption(this.splittingOption.isSet() ? SplittingOption.KEEP: SplittingOption.THROW_AWAY)
+          .maxBufferSize(this.maxBufferSizeOption.getValue())
           .build();
     } catch (Exception e) {
       e.printStackTrace();

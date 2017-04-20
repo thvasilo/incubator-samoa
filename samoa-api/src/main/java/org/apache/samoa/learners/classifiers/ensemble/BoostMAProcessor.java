@@ -49,10 +49,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.PrintStream;
 import java.io.Serializable;
-import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -90,6 +87,7 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
   private int decisionNodeCount;
   private boolean growthAllowed;
   private final SplittingOption splittingOption;
+  private final int maxBufferSize;
 
   private final Instances dataset;
 
@@ -136,6 +134,7 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
     this.parallelismHint = builder.parallelismHint;
     this.timeOut = builder.timeOut;
     this.splittingOption = builder.splittingOption;
+    this.maxBufferSize = builder.maxBufferSize;
 //    this.boostProc = builder.boostProc;
 
 
@@ -178,17 +177,17 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
       instancesSeenAtModelUpdate++;//
       
       //creating the model_updates file for test purposes.It will be deleted later
-      if (firstEvent) {
-        try {
-          metrics = new File(datapath+"_model_"+this.getProcessorId()+"_updates.csv");
-          metadataStream = new PrintStream(
-                  new FileOutputStream(metrics), true);
-          metadataStream.println("Instances seen,model id,splitId, active Leaf Nodes,decision Nodes" );
-        } catch (Exception e) {
-          e.printStackTrace();
-        }
-        firstEvent=false;
-      }
+//      if (firstEvent) {
+//        try {
+//          metrics = new File(datapath+"_model_"+this.getProcessorId()+"_updates.csv");
+//          metadataStream = new PrintStream(
+//                  new FileOutputStream(metrics), true);
+//          metadataStream.println("Instances seen,model id,splitId, active Leaf Nodes,decision Nodes" );
+//        } catch (Exception e) {
+//          e.printStackTrace();
+//        }
+//        firstEvent=false;
+//      }
       
       InstanceContentEvent instanceEvent = (InstanceContentEvent) event;
       this.processInstanceContentEvent(instanceEvent);
@@ -520,7 +519,7 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
     // split if the Hoeffding bound condition is satisfied
     if (shouldSplit) {
 
-      if (bestSuggestion.splitTest != null) {
+      if (bestSuggestion.splitTest != null) { // TODO: What happens when bestSuggestion is null? -> Deactivate node?
         SplitNode newSplit = new SplitNode(bestSuggestion.splitTest, activeLearningNode.getObservedClassDistribution());
 
         for (int i = 0; i < bestSuggestion.numSplits(); i++) {
@@ -537,9 +536,18 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
         } else {
           parent.setChild(parentBranch, newSplit);
         }
+        //if keep w buffer
+        if(splittingOption == SplittingOption.KEEP && this.maxBufferSize > 0) {
+          Queue<Instance> buffer = activeLearningNode.getBuffer();
+//          logger.debug("node: {}. split is happening, there are {} items in buffer", activeLearningNode.getId(), buffer.size());
+          while(!buffer.isEmpty()) {
+            this.trainOnInstanceImpl(buffer.poll());
+          }
+//          logger.debug("node: {}. use all buffered instance for training. Buffer size: {}", activeLearningNode.getId(), buffer.size());
+        }
         //metrics = ("Instances seen,model id,splitId, active Leaf Nodes,decision Nodes")
-        String metricsData = this.instancesSeenAtModelUpdate + "," + this.processorId+"," + splitId +"," + this.activeLeafNodeCount + "," + this.decisionNodeCount;
-        this.metadataStream.println(metricsData);
+//        String metricsData = this.instancesSeenAtModelUpdate + "," + this.processorId+"," + splitId +"," + this.activeLeafNodeCount + "," + this.decisionNodeCount;
+//        this.metadataStream.println(metricsData);
         //---
       }
       // TODO: add check on the model's memory size
@@ -579,7 +587,8 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
   private LearningNode newLearningNode(double[] initialClassObservations, int parallelismHint) {
     // for VHT optimization, we need to dynamically instantiate the appropriate
     // ActiveLearningNode
-    ActiveLearningNode newNode = new ActiveLearningNode(initialClassObservations, parallelismHint, this.splittingOption);
+    ActiveLearningNode newNode = new ActiveLearningNode(initialClassObservations, parallelismHint,
+        this.splittingOption, this.maxBufferSize);
     newNode.setEnsembleId(this.processorId);
     return newNode;
   }
@@ -683,7 +692,7 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
     private int parallelismHint = 1;
     private long timeOut = Integer.MAX_VALUE;
     private SplittingOption splittingOption;
-    private BoostVHTProcessor boostProc = null;
+    private int maxBufferSize = 1000;
   
     public Builder(Instances dataset) {
       this.dataset = dataset;
@@ -729,6 +738,11 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
 
     public Builder splittingOption(SplittingOption splittingOption) {
       this.splittingOption = splittingOption;
+      return this;
+    }
+
+    public Builder maxBufferSize(int maxBufferSize) {
+      this.maxBufferSize = maxBufferSize;
       return this;
     }
   

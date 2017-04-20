@@ -22,7 +22,9 @@ package org.apache.samoa.learners.classifiers.trees;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Queue;
 
+import com.google.common.collect.EvictingQueue;
 import org.apache.samoa.learners.classifiers.ModelAggregator;
 import org.apache.samoa.instances.Instance;
 import org.apache.samoa.learners.classifiers.ensemble.BoostMAProcessor;
@@ -34,12 +36,14 @@ public final class ActiveLearningNode extends LearningNode {
   /**
 	 *
 	 */
-  public enum SplittingOption {THROW_AWAY, KEEP_WO_BUFFER, KEEP_W_BUFFER};
+  public enum SplittingOption {THROW_AWAY, KEEP};
 
   private static final long serialVersionUID = -2892102872646338908L;
   private static final Logger logger = LoggerFactory.getLogger(ActiveLearningNode.class);
 
   private final SplittingOption splittingOption;
+  private final int maxBufferSize;
+  private final EvictingQueue<Instance> buffer;
 
   private double weightSeenAtLastSplitEvaluation;
 
@@ -57,7 +61,7 @@ public final class ActiveLearningNode extends LearningNode {
 
   private boolean isSplitting;
 
-  public ActiveLearningNode(double[] classObservation, int parallelismHint, SplittingOption splitOption) {
+  public ActiveLearningNode(double[] classObservation, int parallelismHint, SplittingOption splitOption, int maxBufferSize) {
     super(classObservation);
     this.weightSeenAtLastSplitEvaluation = this.getWeightSeen();
     this.id = VerticalHoeffdingTree.LearningNodeIdGenerator.generate(); //todo (faye) :: ask if this could affect the singleton property.
@@ -65,9 +69,11 @@ public final class ActiveLearningNode extends LearningNode {
     this.isSplitting = false;
     this.parallelismHint = parallelismHint;
     this.splittingOption = splitOption;
+    this.maxBufferSize = maxBufferSize;
+    this.buffer = EvictingQueue.create(maxBufferSize);
   }
 
-  long getId() {
+  public long getId() {
     return id;
   }
 
@@ -86,23 +92,22 @@ public final class ActiveLearningNode extends LearningNode {
     if (isSplitting) {
       switch (this.splittingOption) {
         case THROW_AWAY:
-          logger.trace("node {} is splitting, throw away the instance",
-              this.id); // throw all instance will splitting
+          //logger.trace("node {}: splitting is happening, throw away the instance", this.id); // throw all instance will splitting
           this.thrownAwayInstance++;
           return;
-        case KEEP_WO_BUFFER:
-          logger.trace("Keep instance without buffer, continue sending to local stats");
-          // do nothing here
-          break;
-        case KEEP_W_BUFFER:
-          // TODO: create the buffer
+        case KEEP:
+          //logger.trace("node {}: keep instance with max buffer size: {}, continue sending to local stats", this.id, this.maxBufferSize);
+          if (this.maxBufferSize > 0) {
+            //logger.trace("node {}: add to buffer", this.id);
+            buffer.add(inst);
+          }
           break;
         default:
-          logger.error("Invalid splittingOption option: {}",
-              this.splittingOption);
+          logger.error("node {}: invalid splittingOption option: {}", this.id, this.splittingOption);
           break;
       }
     }
+
 
     this.observedClassDistribution.addToValue((int) inst.classValue(),
         inst.weight());
@@ -209,9 +214,11 @@ public final class ActiveLearningNode extends LearningNode {
   public void endSplitting() {
     this.isSplitting = false;
     logger.trace("wasted instance: {}", this.thrownAwayInstance);
+    logger.debug("node: {}. end splitting, thrown away instance: {}, buffer size: {}", this.id, this.thrownAwayInstance, this.buffer.size());
     this.thrownAwayInstance = 0;
     this.bestSuggestion = null;
     this.secondBestSuggestion = null;
+    this.buffer.clear();
   }
 
   public AttributeSplitSuggestion getDistributedBestSuggestion() {
@@ -237,7 +244,11 @@ public final class ActiveLearningNode extends LearningNode {
     result = prime * result + obsIndex;
     return Integer.toString(result);
   }
-  
+
+  public Queue<Instance> getBuffer() {
+    return buffer;
+  }
+
   //-----------------faye boostVHT
   public int getEnsembleId() {
     return ensembleId;

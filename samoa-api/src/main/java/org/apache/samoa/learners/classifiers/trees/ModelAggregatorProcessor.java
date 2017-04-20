@@ -553,8 +553,8 @@ public class ModelAggregatorProcessor implements ModelAggregator, Processor {
         }
       }
       //metrics = ("Instances seen,model id,splitId, active Leaf Nodes,decision Nodes")
-      String metricsData = instancesSeenAtModelUpdate + "," + this.processorId+"," + this.splitId +"," + this.activeLeafNodeCount + "," + this.decisionNodeCount;
-      this.metadataStream.println(metricsData);
+//      String metricsData = instancesSeenAtModelUpdate + "," + this.processorId+"," + this.splitId +"," + this.activeLeafNodeCount + "," + this.decisionNodeCount;
+//      this.metadataStream.println(metricsData);
       setInstancesSeenAtModelUpdate(0) ;
       //---
       // TODO: add check on the model's memory size
@@ -594,7 +594,7 @@ public class ModelAggregatorProcessor implements ModelAggregator, Processor {
   private LearningNode newLearningNode(double[] initialClassObservations, int parallelismHint) {
     // for VHT optimization, we need to dynamically instantiate the appropriate
     // ActiveLearningNode
-    return new ActiveLearningNode(initialClassObservations, parallelismHint, ActiveLearningNode.SplittingOption.THROW_AWAY);
+    return new ActiveLearningNode(initialClassObservations, parallelismHint, ActiveLearningNode.SplittingOption.THROW_AWAY, 0);
   }
 
   /**
