@@ -88,7 +88,7 @@ public class BoostVHT implements ClassificationLearner, Configurable {
           200, 0, Integer.MAX_VALUE);
 
   public IntOption timeOutOption = new IntOption("timeOut", 'o',
-          "The duration to wait all distributed computation results from local statistics PI",
+          "The duration to wait all distributed computation results from local statistics PI, in miliseconds",
           Integer.MAX_VALUE, 1, Integer.MAX_VALUE);
 
   public FlagOption binarySplitsOption = new FlagOption("binarySplits", 'b',

@@ -20,6 +20,7 @@ package org.apache.samoa.learners.classifiers.trees;
  * #L%
  */
 
+import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Queue;
@@ -43,7 +44,7 @@ public final class ActiveLearningNode extends LearningNode {
 
   private final SplittingOption splittingOption;
   private final int maxBufferSize;
-  private final EvictingQueue<Instance> buffer;
+  private final Queue<Instance> buffer;
 
   private double weightSeenAtLastSplitEvaluation;
 
@@ -70,7 +71,7 @@ public final class ActiveLearningNode extends LearningNode {
     this.parallelismHint = parallelismHint;
     this.splittingOption = splitOption;
     this.maxBufferSize = maxBufferSize;
-    this.buffer = EvictingQueue.create(maxBufferSize);
+    this.buffer = EvictingQueue.create(maxBufferSize); // new ArrayDeque<>(maxBufferSize)
   }
 
   public long getId() {
@@ -97,10 +98,8 @@ public final class ActiveLearningNode extends LearningNode {
           return;
         case KEEP:
           //logger.trace("node {}: keep instance with max buffer size: {}, continue sending to local stats", this.id, this.maxBufferSize);
-          if (this.maxBufferSize > 0) {
             //logger.trace("node {}: add to buffer", this.id);
             buffer.add(inst);
-          }
           break;
         default:
           logger.error("node {}: invalid splittingOption option: {}", this.id, this.splittingOption);
@@ -171,16 +170,11 @@ public final class ActiveLearningNode extends LearningNode {
     this.suggestionCtr = 0;
     this.thrownAwayInstance = 0;
 
+    // Possible this is causing unnecessary delay, can check if we can remove the abstraction to optimize
     ComputeContentEvent cce = new ComputeContentEvent(splitId, this.id,
         this.getObservedClassDistribution());
-    if (modelAggrProc instanceof  ModelAggregatorProcessor){
-      ModelAggregatorProcessor map = (ModelAggregatorProcessor)modelAggrProc;
-      map.sendToControlStream(cce);
-    } else if(modelAggrProc instanceof BoostMAProcessor) {
-      cce.setEnsembleId(this.ensembleId); //faye boostVHT
-      BoostMAProcessor bmap = (BoostMAProcessor)modelAggrProc;
-      bmap.sendToControlStream(cce);
-    }
+    cce.setEnsembleId(this.ensembleId);
+    modelAggrProc.sendToControlStream(cce);
   }
 
   public void addDistributedSuggestions(AttributeSplitSuggestion bestSuggestion, AttributeSplitSuggestion secondBestSuggestion) {
@@ -213,8 +207,8 @@ public final class ActiveLearningNode extends LearningNode {
 
   public void endSplitting() {
     this.isSplitting = false;
-    logger.trace("wasted instance: {}", this.thrownAwayInstance);
-    logger.debug("node: {}. end splitting, thrown away instance: {}, buffer size: {}", this.id, this.thrownAwayInstance, this.buffer.size());
+//    logger.trace("wasted instance: {}", this.thrownAwayInstance);
+//    logger.debug("node: {}. end splitting, thrown away instance: {}, buffer size: {}", this.id, this.thrownAwayInstance, this.buffer.size());
     this.thrownAwayInstance = 0;
     this.bestSuggestion = null;
     this.secondBestSuggestion = null;
