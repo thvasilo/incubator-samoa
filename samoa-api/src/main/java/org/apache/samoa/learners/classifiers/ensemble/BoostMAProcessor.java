@@ -284,6 +284,7 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
     this.attributeStream.put(event);
   }
 
+  @Override
   public void sendToControlStream(ContentEvent event) {
 //    this.boostProc.getControlStream().put(event);
     this.controlStream.put(event);
@@ -458,7 +459,7 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
 
       // Schedule time-out thread
       ScheduledFuture<?> timeOutHandler = this.executor.schedule(new AggregationTimeOutHandler(this.splitId,
-              this.timedOutSplittingNodes), this.timeOut, TimeUnit.SECONDS);
+              this.timedOutSplittingNodes), this.timeOut, TimeUnit.MILLISECONDS);
 
       // Keep track of the splitting node information, so that we can continue the
       // split
@@ -468,7 +469,7 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
       this.splittingNodes.put(this.splitId, new SplittingNodeInfo(activeLearningNode, foundNode, timeOutHandler));
 
       // Inform Local Statistic PI to perform local statistic calculation
-      activeLearningNode.requestDistributedSuggestions(this.splitId, this); // todo:: what to do???
+      activeLearningNode.requestDistributedSuggestions(this.splitId, this);
     }
   }
 
