@@ -95,10 +95,10 @@ public class BoostVHT implements ClassificationLearner, Configurable {
           "Only allow binary splits.");
 
   public FlagOption splittingOption = new FlagOption("keepInstanceWhileSplitting",'q',
-      "Keep instance while splitting (without buffer)");
+      "Keep instances in a buffer while splitting");
 
   public IntOption maxBufferSizeOption = new IntOption("maxBufferSizeWhileSplitting",'z',
-      "Maximum buffer size while splitting, use in conjuction with 'k' option. Size 0 means we don't use buffer while splitting",
+      "Maximum buffer size while splitting, use in conjunction with 'q' option. Size 0 means we don't use buffer while splitting",
       0, 0, Integer.MAX_VALUE);
   
     /** The ensemble size option. */
@@ -107,10 +107,7 @@ public class BoostVHT implements ClassificationLearner, Configurable {
 
   /** The Model Aggregator boosting processor. */
   private BoostVHTProcessor boostVHTProcessor;
-  
-  /** The Local statistics processor. */
-  private LocalStatisticsProcessor locStatProcessor;
-  
+
   /** The result stream. */
   protected Stream resultStream;
   
@@ -131,8 +128,6 @@ public class BoostVHT implements ClassificationLearner, Configurable {
   //for SAMMME
   public IntOption numberOfClassesOption = new IntOption("numberOfClasses", 'k',
           "The number of classes.", 2, 2, Integer.MAX_VALUE); //for SAMME
-  
-  //---
 
   /**
    * Sets the layout.
@@ -170,12 +165,13 @@ public class BoostVHT implements ClassificationLearner, Configurable {
     controlStream = this.topologyBuilder.createStream(boostVHTProcessor);
     
     //local statistics processor.
-    locStatProcessor = new LocalStatisticsProcessor.Builder()
-            .splitCriterion((SplitCriterion) this.splitCriterionOption.getValue())
-            .binarySplit(this.binarySplitsOption.isSet())
-            .nominalClassObserver((AttributeClassObserver) this.nominalEstimatorOption.getValue())
-            .numericClassObserver((AttributeClassObserver) this.numericEstimatorOption.getValue())
-            .build();
+    /* The Local statistics processor. */
+    LocalStatisticsProcessor locStatProcessor = new LocalStatisticsProcessor.Builder()
+        .splitCriterion((SplitCriterion) this.splitCriterionOption.getValue())
+        .binarySplit(this.binarySplitsOption.isSet())
+        .nominalClassObserver((AttributeClassObserver) this.nominalEstimatorOption.getValue())
+        .numericClassObserver((AttributeClassObserver) this.numericEstimatorOption.getValue())
+        .build();
     
     this.topologyBuilder.addProcessor(locStatProcessor, ensembleSize);
   
