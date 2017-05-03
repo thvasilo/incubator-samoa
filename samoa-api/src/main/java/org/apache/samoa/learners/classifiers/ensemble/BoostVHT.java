@@ -105,6 +105,9 @@ public class BoostVHT implements ClassificationLearner, Configurable {
   public IntOption ensembleSizeOption = new IntOption("ensembleSize", 's',
       "The number of models in the bag.", 10, 1, Integer.MAX_VALUE);
 
+  public IntOption seedOption = new IntOption("seed", 'u',
+      "the seed for the rng.", (int) System.currentTimeMillis());
+
   /** The Model Aggregator boosting processor. */
   private BoostVHTProcessor boostVHTProcessor;
 
@@ -151,6 +154,7 @@ public class BoostVHT implements ClassificationLearner, Configurable {
           .timeOut(this.timeOutOption.getValue())
           .splittingOption(this.splittingOption.isSet() ? SplittingOption.KEEP: SplittingOption.THROW_AWAY)
           .maxBufferSize(this.maxBufferSizeOption.getValue())
+          .seed(this.seedOption.getValue())
           .build();
     } catch (Exception e) {
       e.printStackTrace();
