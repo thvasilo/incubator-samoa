@@ -42,6 +42,7 @@ import org.apache.samoa.moa.classifiers.core.splitcriteria.SplitCriterion;
 import org.apache.samoa.topology.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import java.io.File;
 import java.io.PrintStream;
@@ -151,9 +152,17 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
     this.executor = Executors.newScheduledThreadPool(8);
   }
 
-  @Override
-  public boolean process(ContentEvent event) {
+  public void trainOnInstance(Instance inst) {
+    if (this.treeRoot == null) {
+      this.treeRoot = newLearningNode(this.parallelismHint);
+      this.activeLeafNodeCount = 1;
 
+    }
+    FoundNode foundNode = this.treeRoot.filterInstanceToLeaf(inst, null, -1);
+    trainLeaf(foundNode, inst);
+  }
+
+  public void updateModel(LocalResultContentEvent lrce ) {
     // Poll the blocking queue shared between ModelAggregator and the time-out
     // threads
     Long timedOutSplitId = timedOutSplittingNodes.poll();
@@ -166,81 +175,25 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
       }
     }
 
-    // Receive a new instance from source
-    if (event instanceof InstanceContentEvent) {
-      instancesSeenAtModelUpdate++;//
-      
-      InstanceContentEvent instanceEvent = (InstanceContentEvent) event;
-      Instance inst = instanceEvent.getInstance();
-      boolean isTraining = instanceEvent.isTraining();
-      inst.setDataset(this.dataset);
-      if (isTraining) {
-        prepareTrainingState(inst);
-        performTraining();
-      }
-    } else { // Received event from local stats processor about a split
-      LocalResultContentEvent lrce = (LocalResultContentEvent) event;
-      Long lrceSplitId = lrce.getSplitId();
-      SplittingNodeInfo splittingNodeInfo = splittingNodes.get(lrceSplitId);
+    Long lrceSplitId = lrce.getSplitId();
+    SplittingNodeInfo splittingNodeInfo = splittingNodes.get(lrceSplitId);
 
-      if (splittingNodeInfo != null) { // if null, that means activeLearningNode has been removed by timeout thread
-        ActiveLearningNode activeLearningNode = splittingNodeInfo.activeLearningNode;
-        
-        activeLearningNode.addDistributedSuggestions(lrce.getBestSuggestion(), lrce.getSecondBestSuggestion());
+    if (splittingNodeInfo != null) { // if null, that means activeLearningNode has been removed by timeout thread
+      ActiveLearningNode activeLearningNode = splittingNodeInfo.activeLearningNode;
 
-        if (activeLearningNode.isAllSuggestionsCollected()) {
-          splittingNodeInfo.scheduledFuture.cancel(false);
-          this.splittingNodes.remove(lrceSplitId);
-          this.continueAttemptToSplit(activeLearningNode, splittingNodeInfo.foundNode, lrceSplitId);
-        }
+      activeLearningNode.addDistributedSuggestions(lrce.getBestSuggestion(), lrce.getSecondBestSuggestion());
+
+      if (activeLearningNode.isAllSuggestionsCollected()) {
+        splittingNodeInfo.scheduledFuture.cancel(false);
+        this.splittingNodes.remove(lrceSplitId);
+        this.continueAttemptToSplit(activeLearningNode, splittingNodeInfo.foundNode, lrceSplitId);
       }
     }
-    return true;
   }
 
-  private void performTraining() {
-    // Send information to local-statistic PI
-    // for each of the nodes
-    if (foundNodeSet != null) {
-      for (FoundNode foundNode : foundNodeSet) {
-        ActiveLearningNode leafNode = (ActiveLearningNode) foundNode.getNode();
-        AttributeBatchContentEvent[] abce = leafNode.getAttributeBatchContentEvent();
-        if (abce != null) {
-          for (int i = 0; i < this.dataset.numAttributes() - 1; i++) {
-            this.sendToAttributeStream(abce[i]);
-          }
-        }
-        leafNode.setAttributeBatchContentEvent(null);
-        // See if we can ask for splits
-        if (!leafNode.isSplitting()) {
-          double weightSeen = leafNode.getWeightSeen();
-          // check whether it is the time for splitting
-          if (weightSeen - leafNode.getWeightSeenAtLastSplitEvaluation() >= this.gracePeriod) {
-            attemptToSplit(leafNode, foundNode);
-          }
-        }
-        //todo(faye) the below is added for boostVHT
-        //set the weight seen by model
-        this.weightSeenByModel = leafNode.getWeightSeen();
-      }
-    }
-    this.foundNodeSet = null;
-  }
-
-  /**
-   * Helper method that represent training of an instance. Since it is decision tree, this method routes the incoming
-   * instance into the correct leaf and then update the statistic on the found leaf.
-   *
-   * @param inst
-   */
-  private void prepareTrainingState(Instance inst) {
-    if (this.treeRoot == null) {
-      this.treeRoot = newLearningNode(this.parallelismHint);
-      this.activeLeafNodeCount = 1;
-
-    }
-    FoundNode foundNode = this.treeRoot.filterInstanceToLeaf(inst, null, -1);
-    trainLeaf(foundNode, inst);
+  @Override
+  public boolean process(ContentEvent event) {
+    throw new NotImplementedException();
   }
 
   private void trainLeaf(FoundNode foundNode, Instance inst) {
@@ -257,10 +210,29 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
       LearningNode learningNode = (LearningNode) leafNode;
       learningNode.learnFromInstance(inst, this);
     }
-    if (this.foundNodeSet == null) {
-      this.foundNodeSet = new HashSet<>();
+
+    if (leafNode instanceof ActiveLearningNode) {
+      ActiveLearningNode activeLearningNode = (ActiveLearningNode) leafNode;
+      AttributeBatchContentEvent[] abce = activeLearningNode.getAttributeBatchContentEvent();
+      if (abce != null) {
+        for (int i = 0; i < this.dataset.numAttributes() - 1; i++) {
+          this.sendToAttributeStream(abce[i]);
+        }
+      }
+      activeLearningNode.setAttributeBatchContentEvent(null);
+      // See if we can ask for splits
+      if (!activeLearningNode.isSplitting()) {
+        double weightSeen = activeLearningNode.getWeightSeen();
+        // check whether it is the time for splitting
+        if (weightSeen - activeLearningNode.getWeightSeenAtLastSplitEvaluation() >= this.gracePeriod) {
+          attemptToSplit(activeLearningNode, foundNode);
+        }
+      }
+      //todo(faye) the below is added for boostVHT
+      //set the weight seen by model
+      this.weightSeenByModel = activeLearningNode.getWeightSeen();
     }
-    this.foundNodeSet.add(foundNode);
+
   }
 
   @Override
@@ -471,7 +443,7 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
           Queue<Instance> buffer = activeLearningNode.getBuffer();
 //          logger.debug("node: {}. split is happening, there are {} items in buffer", activeLearningNode.getId(), buffer.size());
           while(!buffer.isEmpty()) {
-            this.prepareTrainingState(buffer.poll());
+            this.trainOnInstance(buffer.poll());
           }
         }
       }
