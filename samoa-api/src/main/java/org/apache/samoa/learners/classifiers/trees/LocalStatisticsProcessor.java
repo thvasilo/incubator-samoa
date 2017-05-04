@@ -104,33 +104,25 @@ public final class LocalStatisticsProcessor implements Processor {
 
       Map<Integer, AttributeClassObserver> learningNodeRowMap = localStats
           .row(learningNodeId);
-      List<AttributeSplitSuggestion> suggestions = new Vector<>();
+      AttributeSplitSuggestion[] suggestions = new AttributeSplitSuggestion[learningNodeRowMap.size()];
 
+      int curIndex = 0;
       for (Entry<Integer, AttributeClassObserver> entry : learningNodeRowMap.entrySet()) {
         AttributeClassObserver obs = entry.getValue();
         AttributeSplitSuggestion suggestion = obs
             .getBestEvaluatedSplitSuggestion(splitCriterion,
                 preSplitDist, entry.getKey(), binarySplit);
-        if (suggestion != null) {
-          suggestions.add(suggestion);
+        if (suggestion == null) {
+          suggestion = new AttributeSplitSuggestion();
         }
+        suggestions[curIndex] = suggestion;
+        curIndex++;
       }
 
-      AttributeSplitSuggestion[] bestSuggestions = suggestions
-          .toArray(new AttributeSplitSuggestion[suggestions.size()]);
+      Arrays.sort(suggestions);
 
-      Arrays.sort(bestSuggestions);
-
-      AttributeSplitSuggestion bestSuggestion = null;
-      AttributeSplitSuggestion secondBestSuggestion = null;
-
-      if (bestSuggestions.length >= 1) {
-        bestSuggestion = bestSuggestions[bestSuggestions.length - 1];
-
-        if (bestSuggestions.length >= 2) {
-          secondBestSuggestion = bestSuggestions[bestSuggestions.length - 2];
-        }
-      }
+      AttributeSplitSuggestion bestSuggestion = suggestions[suggestions.length - 1];
+      AttributeSplitSuggestion secondBestSuggestion = suggestions[suggestions.length - 2];
 
       // create the local result content event
       LocalResultContentEvent lcre =
