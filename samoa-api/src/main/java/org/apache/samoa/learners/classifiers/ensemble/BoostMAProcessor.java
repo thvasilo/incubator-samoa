@@ -212,13 +212,6 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
 
     if (leafNode instanceof ActiveLearningNode) {
       ActiveLearningNode activeLearningNode = (ActiveLearningNode) leafNode;
-      AttributeBatchContentEvent[] abce = activeLearningNode.getAttributeBatchContentEvent();
-      if (abce != null) {
-        for (int i = 0; i < this.dataset.numAttributes() - 1; i++) {
-          this.sendToAttributeStream(abce[i]);
-        }
-      }
-      activeLearningNode.setAttributeBatchContentEvent(null);
       // See if we can ask for splits
       if (!activeLearningNode.isSplitting()) {
         double weightSeen = activeLearningNode.getWeightSeen();
@@ -227,9 +220,6 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
           attemptToSplit(activeLearningNode, foundNode);
         }
       }
-      //todo(faye) the below is added for boostVHT
-      //set the weight seen by model
-      this.weightSeenByModel = activeLearningNode.getWeightSeen();
     }
 
   }
@@ -271,6 +261,7 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
   }
 
   //todo:: is there any reason to synchronize these two methods?
+  @Override
   public void sendToAttributeStream(ContentEvent event) {
     this.attributeStream.put(event);
   }

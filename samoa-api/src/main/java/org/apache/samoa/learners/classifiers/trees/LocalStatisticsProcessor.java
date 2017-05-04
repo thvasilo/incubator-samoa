@@ -28,6 +28,7 @@ import java.util.Vector;
 
 import org.apache.samoa.core.ContentEvent;
 import org.apache.samoa.core.Processor;
+import org.apache.samoa.learners.classifiers.ensemble.AttributeSliceEvent;
 import org.apache.samoa.moa.classifiers.core.AttributeSplitSuggestion;
 import org.apache.samoa.moa.classifiers.core.attributeclassobservers.AttributeClassObserver;
 import org.apache.samoa.moa.classifiers.core.attributeclassobservers.GaussianNumericAttributeClassObserver;
@@ -65,6 +66,7 @@ public final class LocalStatisticsProcessor implements Processor {
   private final boolean binarySplit;
   private final AttributeClassObserver nominalClassObserver;
   private final AttributeClassObserver numericClassObserver;
+  private int id;
 
   // the two observer classes below are also needed to be setup from the Tree
   private LocalStatisticsProcessor(Builder builder) {
@@ -76,44 +78,26 @@ public final class LocalStatisticsProcessor implements Processor {
 
   @Override
   public boolean process(ContentEvent event) {
-    // process AttributeContentEvent by updating the subset of local statistics
-    if (event instanceof AttributeBatchContentEvent) {
-      AttributeBatchContentEvent abce = (AttributeBatchContentEvent) event;
-      List<ContentEvent> contentEventList = abce.getContentEventList();
-      for (ContentEvent contentEvent : contentEventList) {
-        AttributeContentEvent ace = (AttributeContentEvent) contentEvent;
-        Long learningNodeId = ace.getLearningNodeId();
-        Integer obsIndex = ace.getObsIndex();
 
-        AttributeClassObserver obs = localStats.get(
-            learningNodeId, obsIndex);
+    if (event instanceof AttributeSliceEvent) {
+      AttributeSliceEvent ase = (AttributeSliceEvent) event;
+//      System.out.printf("Event with key: %s processed by LSP: %d%n", ase.getKey(), id);
+      double[] attributeSlice = ase.getAttributeSlice();
+      boolean[] isNominal = ase.getIsNominalSlice();
+      int startingIndex = ase.getAttributeStartingIndex();
+      Long learningNodeId = ase.getLearningNodeId();
 
+      for (int i = 0; i < attributeSlice.length; i++) {
+        Integer obsIndex = i + startingIndex;
+        AttributeClassObserver obs = localStats.get(learningNodeId, obsIndex);
         if (obs == null) {
-          obs = ace.isNominal() ? newNominalClassObserver()
-              : newNumericClassObserver();
-          localStats.put(ace.getLearningNodeId(), obsIndex, obs);
+          obs = isNominal[i] ? newNominalClassObserver() : newNumericClassObserver();
+          localStats.put(learningNodeId, obsIndex, obs);
         }
-        obs.observeAttributeClass(ace.getAttrVal(), ace.getClassVal(),
-            ace.getWeight());
+        obs.observeAttributeClass(attributeSlice[i], ase.getClassValue(),
+            ase.getWeight());
       }
-
-      /*
-       * if (event instanceof AttributeContentEvent) { AttributeContentEvent ace
-       * = (AttributeContentEvent) event; Long learningNodeId =
-       * Long.valueOf(ace.getLearningNodeId()); Integer obsIndex =
-       * Integer.valueOf(ace.getObsIndex());
-       * 
-       * AttributeClassObserver obs = localStats.get( learningNodeId, obsIndex);
-       * 
-       * if (obs == null) { obs = ace.isNominal() ? newNominalClassObserver() :
-       * newNumericClassObserver(); localStats.put(ace.getLearningNodeId(),
-       * obsIndex, obs); } obs.observeAttributeClass(ace.getAttrVal(),
-       * ace.getClassVal(), ace.getWeight());
-       */
-    } else if (event instanceof ComputeContentEvent) {
-//      logger.info("_____________________ LocalStatisticsProcessor logger");
-      // process ComputeContentEvent by calculating the local statistic
-      // and send back the calculation results via computation result stream.
+    } else {
       ComputeContentEvent cce = (ComputeContentEvent) event;
       Long learningNodeId = cce.getLearningNodeId();
       double[] preSplitDist = cce.getPreSplitDist();
@@ -154,16 +138,13 @@ public final class LocalStatisticsProcessor implements Processor {
       lcre.setEnsembleId(cce.getEnsembleId()); //faye boostVHT
       computationResultStream.put(lcre);
       logger.debug("Finish compute event");
-    } else if (event instanceof DeleteContentEvent) {
-      DeleteContentEvent dce = (DeleteContentEvent) event;
-      Long learningNodeId = dce.getLearningNodeId();
-      localStats.rowMap().remove(learningNodeId);
     }
-    return false;
+    return true;
   }
 
   @Override
   public void onCreate(int id) {
+    this.id = id;
     this.localStats = HashBasedTable.create();
   }
 

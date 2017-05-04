@@ -261,7 +261,8 @@ public class ModelAggregatorProcessor implements ModelAggregator, Processor {
     this.controlStream = controlStream;
   }
 
-  void sendToAttributeStream(ContentEvent event) {
+  @Override
+  public void sendToAttributeStream(ContentEvent event) {
     this.attributeStream.put(event);
   }
 

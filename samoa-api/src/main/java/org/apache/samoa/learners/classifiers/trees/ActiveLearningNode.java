@@ -20,14 +20,13 @@ package org.apache.samoa.learners.classifiers.trees;
  * #L%
  */
 
-import java.util.ArrayDeque;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Queue;
+import java.util.*;
 
 import com.google.common.collect.EvictingQueue;
+import org.apache.samoa.instances.Attribute;
 import org.apache.samoa.learners.classifiers.ModelAggregator;
 import org.apache.samoa.instances.Instance;
+import org.apache.samoa.learners.classifiers.ensemble.AttributeSliceEvent;
 import org.apache.samoa.learners.classifiers.ensemble.BoostMAProcessor;
 import org.apache.samoa.moa.classifiers.core.AttributeSplitSuggestion;
 import org.slf4j.Logger;
@@ -107,44 +106,37 @@ public final class ActiveLearningNode extends LearningNode {
       }
     }
 
-
+    // What we do is slice up the attributes array into parallelismHint (no. of local stats processors - LSP)
+    // and send only one message per LSP which contains that slice of the attributes along with required information
+    // to update the class observers.
+    // Given that we are sending slices, there's probably some optimizations that can be made at the LSP level,
+    // like being smarter about how we update the observers.
     this.observedClassDistribution.addToValue((int) inst.classValue(),
         inst.weight());
-    // done: parallelize by sending attributes one by one
-    // TODO: meanwhile, we can try to use the ThreadPool to execute it
-    // separately
-    // DONE: parallelize by sending in batch, i.e. split the attributes into
-    // chunk instead of send the attribute one by one
+    double[] attributeArray =  inst.toDoubleArray();
+    int sliceSize = (attributeArray.length - 1) / parallelismHint;
+    boolean[] isNominalAll = new boolean[inst.numAttributes() - 1];
     for (int i = 0; i < inst.numAttributes() - 1; i++) {
-      int instAttIndex = modelAttIndexToInstanceAttIndex(i, inst);
-      Integer obsIndex = i;
-      String key = attributeContentEventKeys.get(obsIndex);
-
-      if (key == null) {
-        key = this.generateKey(i);
-        attributeContentEventKeys.put(obsIndex, key);
+      Attribute att = inst.attribute(i);
+      if (att.isNominal()) {
+        isNominalAll[i] = true;
       }
-      AttributeContentEvent ace = new AttributeContentEvent.Builder(
-          this.id, i, key)
-          .attrValue(inst.value(instAttIndex))
-          .classValue((int) inst.classValue())
-          .weight(inst.weight())
-          .isNominal(inst.attribute(instAttIndex).isNominal())
-          .build();
-      if (this.attributeBatchContentEvent == null) {
-        this.attributeBatchContentEvent = new AttributeBatchContentEvent[inst.numAttributes() - 1];
-      }
-      if (this.attributeBatchContentEvent[i] == null) {
-        this.attributeBatchContentEvent[i] = new AttributeBatchContentEvent.Builder(
-            this.id, i, key)
-            // .attrValue(inst.value(instAttIndex))
-            // .classValue((int) inst.classValue())
-            // .weight(inst.weight()]
-            .isNominal(inst.attribute(instAttIndex).isNominal())
-            .build();
-      }
-      this.attributeBatchContentEvent[i].add(ace);
-      // proc.sendToAttributeStream(ace);
+    }
+    int startingIndex = 0;
+    for (int localStatsIndex = 0; localStatsIndex < parallelismHint; localStatsIndex++) {
+      // The endpoint for the slice is either the end of the previous slice, or the end of the array
+      // TODO: Note that we assume class is at the end of the instance attribute array, hence the length-1 here
+      // We can do proper handling later
+      int endpoint = localStatsIndex == (parallelismHint - 1) ? (attributeArray.length-1) : (localStatsIndex + 1) * sliceSize;
+      double[] attributeSlice = Arrays.copyOfRange(
+          attributeArray, localStatsIndex * sliceSize, endpoint);
+      boolean[] isNominalSlice = Arrays.copyOfRange(
+          isNominalAll, localStatsIndex * sliceSize, endpoint);
+      AttributeSliceEvent attributeSliceEvent = new AttributeSliceEvent(
+          this.id, startingIndex, Integer.toString(localStatsIndex), isNominalSlice, attributeSlice,
+          (int) inst.classValue(), inst.weight());
+      proc.sendToAttributeStream(attributeSliceEvent);
+      startingIndex = endpoint;
     }
   }
 
@@ -232,11 +224,7 @@ public final class ActiveLearningNode extends LearningNode {
   }
 
   private String generateKey(int obsIndex) {
-    final int prime = 31;
-    int result = 1;
-    result = prime * result + (int) (this.id ^ (this.id >>> 32));
-    result = prime * result + obsIndex;
-    return Integer.toString(result);
+    return Integer.toString(obsIndex % parallelismHint);
   }
 
   public Queue<Instance> getBuffer() {
