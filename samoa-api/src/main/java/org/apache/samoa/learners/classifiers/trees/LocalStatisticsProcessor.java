@@ -160,11 +160,11 @@ public final class LocalStatisticsProcessor implements Processor {
   }
 
   private AttributeClassObserver newNominalClassObserver() {
-    return (AttributeClassObserver) this.nominalClassObserver.copy();
+    return new NominalAttributeClassObserver();
   }
 
   private AttributeClassObserver newNumericClassObserver() {
-    return (AttributeClassObserver) this.numericClassObserver.copy();
+    return new GaussianNumericAttributeClassObserver();
   }
 
   /**
