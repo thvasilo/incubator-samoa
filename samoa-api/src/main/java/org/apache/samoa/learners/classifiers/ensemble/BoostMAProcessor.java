@@ -92,7 +92,6 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
   // to support concurrent split
   private long splitId;
   private ConcurrentMap<Long, SplittingNodeInfo> splittingNodes;
-  private BlockingQueue<Long> timedOutSplittingNodes;
 
   private Stream attributeStream;
   private Stream controlStream;
@@ -144,7 +143,6 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
     this.growthAllowed = true;
 
     this.splittingNodes = new ConcurrentHashMap<>();
-    this.timedOutSplittingNodes = new LinkedBlockingQueue<>();
     this.splitId = 0;
     
     // Executor for scheduling time-out threads
@@ -162,17 +160,6 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
   }
 
   public void updateModel(LocalResultContentEvent lrce ) {
-    // Poll the blocking queue shared between ModelAggregator and the time-out
-    // threads
-    Long timedOutSplitId = timedOutSplittingNodes.poll();
-    if (timedOutSplitId != null) { // time out has been reached!
-      SplittingNodeInfo splittingNode = splittingNodes.get(timedOutSplitId);
-      if (splittingNode != null) {
-        this.splittingNodes.remove(timedOutSplitId);
-        this.continueAttemptToSplit(splittingNode.activeLearningNode, splittingNode.foundNode,timedOutSplitId);
-
-      }
-    }
 
     Long lrceSplitId = lrce.getSplitId();
     SplittingNodeInfo splittingNodeInfo = splittingNodes.get(lrceSplitId);
@@ -183,7 +170,6 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
       activeLearningNode.addDistributedSuggestions(lrce.getBestSuggestion(), lrce.getSecondBestSuggestion());
 
       if (activeLearningNode.isAllSuggestionsCollected()) {
-        splittingNodeInfo.scheduledFuture.cancel(false);
         this.splittingNodes.remove(lrceSplitId);
         this.continueAttemptToSplit(activeLearningNode, splittingNodeInfo.foundNode, lrceSplitId);
       }
@@ -348,16 +334,12 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
       // Increment the split ID
       this.splitId++;
 
-      // Schedule time-out thread
-      ScheduledFuture<?> timeOutHandler = this.executor.schedule(new AggregationTimeOutHandler(this.splitId,
-              this.timedOutSplittingNodes), this.timeOut, TimeUnit.MILLISECONDS);
-
       // Keep track of the splitting node information, so that we can continue the
       // split
       // once we receive all local statistic calculation from Local Statistic PI
       // this.splittingNodes.put(Long.valueOf(this.splitId), new
       // SplittingNodeInfo(activeLearningNode, foundNode, null));
-      this.splittingNodes.put(this.splitId, new SplittingNodeInfo(activeLearningNode, foundNode, timeOutHandler));
+      this.splittingNodes.put(this.splitId, new SplittingNodeInfo(activeLearningNode, foundNode));
 
       // Inform Local Statistic PI to perform local statistic calculation
       activeLearningNode.requestDistributedSuggestions(this.splitId, this);
@@ -541,12 +523,10 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
     private static final long serialVersionUID = -7554027391092238573L;
     private final ActiveLearningNode activeLearningNode;
     private final FoundNode foundNode;
-    private final transient ScheduledFuture<?> scheduledFuture;
 
-    SplittingNodeInfo(ActiveLearningNode activeLearningNode, FoundNode foundNode, ScheduledFuture<?> scheduledFuture) {
+    SplittingNodeInfo(ActiveLearningNode activeLearningNode, FoundNode foundNode) {
       this.activeLearningNode = activeLearningNode;
       this.foundNode = foundNode;
-      this.scheduledFuture = scheduledFuture;
     }
   }
 

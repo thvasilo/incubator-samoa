@@ -21,10 +21,8 @@ package org.apache.samoa.learners.classifiers.trees;
  */
 
 import java.util.Arrays;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Vector;
 
 import org.apache.samoa.core.ContentEvent;
 import org.apache.samoa.core.Processor;
@@ -81,57 +79,67 @@ public final class LocalStatisticsProcessor implements Processor {
 
     if (event instanceof AttributeSliceEvent) {
       AttributeSliceEvent ase = (AttributeSliceEvent) event;
-//      System.out.printf("Event with key: %s processed by LSP: %d%n", ase.getKey(), id);
-      double[] attributeSlice = ase.getAttributeSlice();
-      boolean[] isNominal = ase.getIsNominalSlice();
-      int startingIndex = ase.getAttributeStartingIndex();
-      Long learningNodeId = ase.getLearningNodeId();
+      processAttributeSlice(ase);
 
-      for (int i = 0; i < attributeSlice.length; i++) {
-        Integer obsIndex = i + startingIndex;
-        AttributeClassObserver obs = localStats.get(learningNodeId, obsIndex);
-        if (obs == null) {
-          obs = isNominal[i] ? newNominalClassObserver() : newNumericClassObserver();
-          localStats.put(learningNodeId, obsIndex, obs);
-        }
-        obs.observeAttributeClass(attributeSlice[i], ase.getClassValue(),
-            ase.getWeight());
-      }
     } else {
       ComputeContentEvent cce = (ComputeContentEvent) event;
-      Long learningNodeId = cce.getLearningNodeId();
-      double[] preSplitDist = cce.getPreSplitDist();
+      processComputeEvent(cce);
 
-      Map<Integer, AttributeClassObserver> learningNodeRowMap = localStats
-          .row(learningNodeId);
-      AttributeSplitSuggestion[] suggestions = new AttributeSplitSuggestion[learningNodeRowMap.size()];
-
-      int curIndex = 0;
-      for (Entry<Integer, AttributeClassObserver> entry : learningNodeRowMap.entrySet()) {
-        AttributeClassObserver obs = entry.getValue();
-        AttributeSplitSuggestion suggestion = obs
-            .getBestEvaluatedSplitSuggestion(splitCriterion,
-                preSplitDist, entry.getKey(), binarySplit);
-        if (suggestion == null) {
-          suggestion = new AttributeSplitSuggestion();
-        }
-        suggestions[curIndex] = suggestion;
-        curIndex++;
-      }
-
-      Arrays.sort(suggestions);
-
-      AttributeSplitSuggestion bestSuggestion = suggestions[suggestions.length - 1];
-      AttributeSplitSuggestion secondBestSuggestion = suggestions[suggestions.length - 2];
-
-      // create the local result content event
-      LocalResultContentEvent lcre =
-          new LocalResultContentEvent(cce.getSplitId(), bestSuggestion, secondBestSuggestion);
-      lcre.setEnsembleId(cce.getEnsembleId()); //faye boostVHT
-      computationResultStream.put(lcre);
-      logger.debug("Finish compute event");
     }
     return true;
+  }
+
+  private void processComputeEvent(ComputeContentEvent cce) {
+    Long learningNodeId = cce.getLearningNodeId();
+    double[] preSplitDist = cce.getPreSplitDist();
+
+    Map<Integer, AttributeClassObserver> learningNodeRowMap = localStats.row(learningNodeId);
+    AttributeSplitSuggestion[] suggestions = new AttributeSplitSuggestion[learningNodeRowMap.size()];
+
+    int curIndex = 0;
+    for (Entry<Integer, AttributeClassObserver> entry : learningNodeRowMap.entrySet()) {
+      AttributeClassObserver obs = entry.getValue();
+      AttributeSplitSuggestion suggestion = obs
+          .getBestEvaluatedSplitSuggestion(splitCriterion,
+              preSplitDist, entry.getKey(), binarySplit);
+      if (suggestion == null) {
+        suggestion = new AttributeSplitSuggestion();
+      }
+      suggestions[curIndex] = suggestion;
+      curIndex++;
+    }
+
+    // Doing this sort instead of keeping the max and second max seems faster for some reason
+    Arrays.sort(suggestions);
+
+    AttributeSplitSuggestion bestSuggestion = suggestions[suggestions.length - 1];
+    AttributeSplitSuggestion secondBestSuggestion = suggestions[suggestions.length - 2];
+
+    // create the local result content event
+    LocalResultContentEvent lcre =
+        new LocalResultContentEvent(cce.getSplitId(), bestSuggestion, secondBestSuggestion);
+    lcre.setEnsembleId(cce.getEnsembleId()); //faye boostVHT
+    computationResultStream.put(lcre);
+  }
+
+  private void processAttributeSlice(AttributeSliceEvent ase) {
+    //      System.out.printf("Event with key: %s processed by LSP: %d%n", ase.getKey(), id);
+    double[] attributeSlice = ase.getAttributeSlice();
+    boolean[] isNominal = ase.getIsNominalSlice();
+    int startingIndex = ase.getAttributeStartingIndex();
+    Long learningNodeId = ase.getLearningNodeId();
+    int classValue = ase.getClassValue();
+    double weight = ase.getWeight();
+
+    for (int i = 0; i < attributeSlice.length; i++) {
+      Integer obsIndex = i + startingIndex;
+      AttributeClassObserver obs = localStats.get(learningNodeId, obsIndex);
+      if (obs == null) {
+        obs = isNominal[i] ? newNominalClassObserver() : newNumericClassObserver();
+        localStats.put(learningNodeId, obsIndex, obs);
+      }
+      obs.observeAttributeClass(attributeSlice[i], classValue, weight);
+    }
   }
 
   @Override

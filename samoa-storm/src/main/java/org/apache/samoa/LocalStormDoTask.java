@@ -23,6 +23,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import org.apache.samoa.learners.InstanceContentEvent;
+import org.apache.samoa.learners.ResultContentEvent;
+import org.apache.samoa.learners.classifiers.ensemble.AttributeSliceEvent;
+import org.apache.samoa.learners.classifiers.trees.ComputeContentEvent;
+import org.apache.samoa.learners.classifiers.trees.LocalResultContentEvent;
+import org.apache.samoa.moa.core.InstanceExample;
 import org.apache.samoa.topology.impl.StormSamoaUtils;
 import org.apache.samoa.topology.impl.StormTopology;
 import org.slf4j.Logger;
@@ -69,6 +75,12 @@ public class LocalStormDoTask {
     conf.setMaxTaskParallelism(numWorker);
 
     backtype.storm.LocalCluster cluster = new backtype.storm.LocalCluster();
+    conf.registerSerialization(AttributeSliceEvent.class);
+    conf.registerSerialization(InstanceContentEvent.class);
+    conf.registerSerialization(ComputeContentEvent.class);
+    conf.registerSerialization(InstanceExample.class);
+    conf.registerSerialization(LocalResultContentEvent.class);
+    conf.registerSerialization(ResultContentEvent.class);
     cluster.submitTopology(topologyName, conf, stormTopo.getStormBuilder().createTopology());
 
     // Read local mode execution duration from property file

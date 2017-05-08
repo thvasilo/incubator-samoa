@@ -140,8 +140,8 @@ class StormEntranceProcessingItem extends AbstractEntranceProcessingItem impleme
       if (entranceProcessor.hasNext()) {
         Values value = newValues(entranceProcessor.nextEvent());
         collector.emit(outputStream.getOutputId(), value);
-      } else
-        Utils.sleep(1000);
+      }
+//        Utils.sleep(1);
       // StormTupleInfo tupleInfo = tupleInfoQueue.poll(50,
       // TimeUnit.MILLISECONDS);
       // if (tupleInfo != null) {
