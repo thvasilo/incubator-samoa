@@ -110,6 +110,9 @@ public class BoostVHT implements ClassificationLearner, Configurable {
   public StringOption boosterOption = new StringOption("boostingAlgo", 'a',
       "The boosting algorithm to use, options: OzaBoost, OnlineBBM", "OzaBoost");
 
+  public IntOption numLocalStats = new IntOption("numLocalStats", 'f',
+      "The number of local statistics processors to use.", 10, 1, Integer.MAX_VALUE);
+
   /** The Model Aggregator boosting processor. */
   private BoostVHTProcessor boostVHTProcessor;
 
@@ -151,7 +154,7 @@ public class BoostVHT implements ClassificationLearner, Configurable {
           .splitConfidence(this.splitConfidenceOption.getValue())
           .tieThreshold(this.tieThresholdOption.getValue())
           .gracePeriod(this.gracePeriodOption.getValue())
-          .parallelismHint(this.ensembleSizeOption.getValue())
+          .parallelismHint(numLocalStats.getValue())
           .timeOut(this.timeOutOption.getValue())
           .splittingOption(this.splittingOption.isSet() ? SplittingOption.KEEP: SplittingOption.THROW_AWAY)
           .maxBufferSize(this.maxBufferSizeOption.getValue())
@@ -198,7 +201,7 @@ public class BoostVHT implements ClassificationLearner, Configurable {
         .numericClassObserver((AttributeClassObserver) this.numericEstimatorOption.getValue())
         .build();
     
-    this.topologyBuilder.addProcessor(locStatProcessor, ensembleSize);
+    this.topologyBuilder.addProcessor(locStatProcessor, numLocalStats.getValue());
   
     this.topologyBuilder.connectInputKeyStream(attributeStream, locStatProcessor);
     this.topologyBuilder.connectInputAllStream(controlStream, locStatProcessor);

@@ -64,7 +64,7 @@ public final class ActiveLearningNode extends LearningNode {
   public ActiveLearningNode(double[] classObservation, int parallelismHint, SplittingOption splitOption, int maxBufferSize) {
     super(classObservation);
     this.weightSeenAtLastSplitEvaluation = this.getWeightSeen();
-    this.id = VerticalHoeffdingTree.LearningNodeIdGenerator.generate(); //todo (faye) :: ask if this could affect the singleton property.
+    this.id = VerticalHoeffdingTree.LearningNodeIdGenerator.generate();
     this.attributeContentEventKeys = new HashMap<>();
     this.isSplitting = false;
     this.parallelismHint = parallelismHint;
@@ -116,6 +116,7 @@ public final class ActiveLearningNode extends LearningNode {
     double[] attributeArray =  inst.toDoubleArray();
     int sliceSize = (attributeArray.length - 1) / parallelismHint;
     boolean[] isNominalAll = new boolean[inst.numAttributes() - 1];
+    // First we run through all the attributes to see which are nominal. We really should only be doing this once...
     for (int i = 0; i < inst.numAttributes() - 1; i++) {
       Attribute att = inst.attribute(i);
       if (att.isNominal()) {
@@ -123,6 +124,7 @@ public final class ActiveLearningNode extends LearningNode {
       }
     }
     int startingIndex = 0;
+    // Then we run through the number of local stats processors to send one attribute slice message to each
     for (int localStatsIndex = 0; localStatsIndex < parallelismHint; localStatsIndex++) {
       // The endpoint for the slice is either the end of the previous slice, or the end of the array
       // TODO: Note that we assume class is at the end of the instance attribute array, hence the length-1 here
@@ -215,6 +217,7 @@ public final class ActiveLearningNode extends LearningNode {
     return this.secondBestSuggestion;
   }
 
+  // TODO: For Storm I have observed better results with majority voting only
   public boolean isAllSuggestionsCollected() {
     return (this.suggestionCtr == this.parallelismHint);
   }
