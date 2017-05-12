@@ -192,14 +192,14 @@ public class EvaluatorProcessor implements Processor {
     if (immediateResultStream != null) {
       if (firstDump) {
         immediateResultStream.println(learningCurve.headerToString());
-        metadataStream.println("#Instances classified, Experiment's Wall clock ");
+//        metadataStream.println("#Instances classified, Experiment's Wall clock ");
         firstDump = false;
       }
 
       immediateResultStream.println(learningCurve.entryToString(learningCurve.numEntries() - 1));
       immediateResultStream.flush();
-  
-      metadataStream.println(totalCount + "," +sampleDurationInNanoseconds );
+
+//      metadataStream.println(totalCount + "," +sampleDurationInNanoseconds );
     }
   }
 

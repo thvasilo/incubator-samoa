@@ -31,95 +31,68 @@ import org.apache.samoa.learners.classifiers.trees.LocalResultContentEvent;
 import org.apache.samoa.moa.classifiers.core.splitcriteria.InfoGainSplitCriterion;
 import org.apache.samoa.moa.classifiers.core.splitcriteria.SplitCriterion;
 import org.apache.samoa.moa.core.DoubleVector;
-import org.apache.samoa.moa.core.MiscUtils;
 import org.apache.samoa.topology.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.PrintStream;
 import java.util.Random;
-import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * The Class BoostVHTProcessor.
  */
-public class BoostVHTProcessor implements Processor {
+abstract public class BoostVHTProcessor implements Processor {
 
   private static final long serialVersionUID = -1550901409625192730L;
   private static final Logger logger = LoggerFactory.getLogger(BoostVHTProcessor.class);
   
   //--- they are configured from the user in BoostVHT
-  private SplitCriterion splitCriterion;
+  protected SplitCriterion splitCriterion;
   
-  private Double splitConfidence;
+  protected Double splitConfidence;
   
-  private Double tieThreshold;
+  protected Double tieThreshold;
   
-  private int gracePeriod;
+  protected int gracePeriod;
   
-  private int parallelismHint;
+  protected int parallelismHint;
   
-  private int timeOut;
+  protected int timeOut;
 
-  private ActiveLearningNode.SplittingOption splittingOption;
+  protected ActiveLearningNode.SplittingOption splittingOption;
   
   //------
   
 
   /** The input dataset to BoostVHT. */
-  private Instances dataset;
+  protected Instances dataset;
   
   /** The ensemble size. */
-  private int ensembleSize;
+  protected int ensembleSize;
   
   /** The result stream. */
-  private Stream resultStream;
+  protected Stream resultStream;
   
   /** The control stream. */
-  private Stream controlStream;
+  protected Stream controlStream;
   
   /** The attribute stream. */
-  private Stream attributeStream;
+  protected Stream attributeStream;
   
   protected BoostMAProcessor[] mAPEnsemble;
 
   /** Ramdom number generator. */
-  protected Random random; //TODO make random seed configurable
+  protected Random random;
 
-  private int seed;
+  protected int seed;
 
-  //-----
-  // lambda_m correct
-  protected double[] scms;
   
-  // lambda_m wrong
-  protected double[] swms;
+  protected double trainingWeightSeenByModel; //todo:: (Faye) when is this updated?
 
-  // e_m
-  private double[] e_m;
-  
-  private double trainingWeightSeenByModel; //todo:: (Faye) when is this updated?
+  protected int numberOfClasses;
 
-  private int numberOfClasses;
+  protected int maxBufferSize;
 
-  private int maxBufferSize;
-
-  private BoostVHTProcessor(Builder builder) {
-    this.dataset = builder.dataset;
-    this.ensembleSize = builder.ensembleSize;
-    this.seed = builder.seed;
-    this.numberOfClasses = builder.numberOfClasses;
-    this.splitCriterion = builder.splitCriterion;
-    this.splitConfidence = builder.splitConfidence;
-    this.tieThreshold = builder.tieThreshold;
-    this.gracePeriod = builder.gracePeriod;
-    this.parallelismHint = builder.parallelismHint;
-    this.timeOut = builder.timeOut;
-    this.splittingOption = builder.splittingOption;
-    this.maxBufferSize = builder.maxBufferSize;
-  }
+  public BoostVHTProcessor() {}
 
   /**
    * On event.
@@ -133,20 +106,15 @@ public class BoostVHTProcessor implements Processor {
       InstanceContentEvent inEvent = (InstanceContentEvent) event;
       //todo:: (Faye) check if any precondition is needed
 
-      if (inEvent.isTesting()) {
-        double[] combinedPrediction = computeBoosting(inEvent);
-        this.resultStream.put(newResultContentEvent(combinedPrediction, inEvent));
-      }
+      double[] combinedPrediction = predict(inEvent);
+      this.resultStream.put(newResultContentEvent(combinedPrediction, inEvent));
 
       // estimate model parameters using the training data
-      if (inEvent.isTraining()) {
-        train(inEvent);
-      }
+      train(inEvent);
     } else if (event instanceof LocalResultContentEvent) {
       LocalResultContentEvent lrce = (LocalResultContentEvent) event;
       mAPEnsemble[lrce.getEnsembleId()].updateModel(lrce);
     }
-
 
     return true;
   }
@@ -158,10 +126,6 @@ public class BoostVHTProcessor implements Processor {
 
     random = new Random(seed);
 
-    this.scms = new double[ensembleSize];
-    this.swms = new double[ensembleSize];
-    this.e_m = new double[ensembleSize];
-    
 //    this.nOfMsgPerEnseble = new long[ensembleSize];
     
     //----instantiate the MAs
@@ -171,8 +135,8 @@ public class BoostVHTProcessor implements Processor {
           .splitConfidence(splitConfidence)
           .tieThreshold(tieThreshold)
           .gracePeriod(gracePeriod)
-          .parallelismHint(this.parallelismHint)
-          .timeOut(timeOut) //          .boostProcessor(this)
+          .parallelismHint(parallelismHint)
+          .timeOut(timeOut)
           .processorID(i) // The BoostMA processors get incremental ids
           .maxBufferSize(maxBufferSize)
           .splittingOption(splittingOption)
@@ -182,74 +146,11 @@ public class BoostVHTProcessor implements Processor {
       mAPEnsemble[i] = newProc;
     }
   }
-  
-  // todo:: (Faye) use also the boosting algo and the training weight for each model to compute the final result and put it to the resultStream
-  private double[] computeBoosting(InstanceContentEvent inEvent) {
-    
-    Instance testInstance = inEvent.getInstance();
-    DoubleVector combinedPredictions = new DoubleVector();
 
-    for (int i = 0; i < ensembleSize; i++) {
-      double memberWeight = getEnsembleMemberWeight(i);
-      if (memberWeight > 0.0) {
-        DoubleVector vote = new DoubleVector(mAPEnsemble[i].getVotesForInstance(testInstance));
-        if (vote.sumOfValues() > 0.0) {
-          vote.normalize();
-          vote.scaleValues(memberWeight);
-          combinedPredictions.addValues(vote);
-        }
-      } else {
-        break;
-      }
-    }
-    return combinedPredictions.getArrayRef();
-  }
-  
-  /**
-   * Train.
-   *
-   * @param inEvent
-   *          the in event
-   */
-  protected void train(InstanceContentEvent inEvent) {
-    Instance trainInstance = inEvent.getInstance();
+  abstract protected double[] predict(InstanceContentEvent inEvent);
 
-    this.trainingWeightSeenByModel += trainInstance.weight();
-    double lambda_d = 1.0;
-    
-    for (int i = 0; i < ensembleSize; i++) { //for each base model
-      int k = MiscUtils.poisson(lambda_d, this.random); //set k according to poisson
+  abstract protected void train(InstanceContentEvent inEvent);
 
-      if (k > 0) {
-        Instance weightedInstance = trainInstance.copy();
-        weightedInstance.setWeight(trainInstance.weight() * k);
-        mAPEnsemble[i].trainOnInstance(weightedInstance);
-      }
-      //get prediction for the instance from the specific learner of the ensemble
-      double[] prediction = mAPEnsemble[i].getVotesForInstance(trainInstance);
-      
-      //correctlyClassifies method of BoostMAProcessor
-      if (mAPEnsemble[i].correctlyClassifies(trainInstance,prediction)) {
-        this.scms[i] += lambda_d;
-        lambda_d *= this.trainingWeightSeenByModel / (2 * this.scms[i]);
-      } else {
-        this.swms[i] += lambda_d;
-        lambda_d *= this.trainingWeightSeenByModel / (2 * this.swms[i]);
-      }
-    }
-  }
-  
-  private double getEnsembleMemberWeight(int i) {
-    double em = this.swms[i] / (this.scms[i] + this.swms[i]);
-//    if ((em == 0.0) || (em > 0.5)) {
-    if ((em == 0.0) || (em > (1.0 - 1.0/this.numberOfClasses))) { //for SAMME
-      return 0.0;
-    }
-    double Bm = em / (1.0 - em);
-//    return Math.log(1.0 / Bm);
-    return Math.log(1.0 / Bm ) + Math.log(this.numberOfClasses - 1); //for SAMME
-  }
-  
   /**
    * Helper method to generate new ResultContentEvent based on an instance and its prediction result.
    *
@@ -266,28 +167,30 @@ public class BoostVHTProcessor implements Processor {
     return rce;
   }
 
-  public static class Builder {
+  public static class BoostBuilder {
     // BoostVHT processor parameters
-    private final Instances dataset;
-    private int ensembleSize;
-    private int numberOfClasses;
+    protected Instances dataset;
+    protected int ensembleSize;
+    protected int numberOfClasses;
 
     // BoostMAProcessor parameters
-    private SplitCriterion splitCriterion = new InfoGainSplitCriterion();
-    private double splitConfidence;
-    private double tieThreshold;
-    private int gracePeriod;
-    private int parallelismHint;
-    private int timeOut = Integer.MAX_VALUE;
-    private ActiveLearningNode.SplittingOption splittingOption;
-    private int maxBufferSize;
-    private int seed;
+    protected SplitCriterion splitCriterion = new InfoGainSplitCriterion();
+    protected double splitConfidence;
+    protected double tieThreshold;
+    protected int gracePeriod;
+    protected int parallelismHint;
+    protected int timeOut = Integer.MAX_VALUE;
+    protected ActiveLearningNode.SplittingOption splittingOption;
+    protected int maxBufferSize;
+    protected int seed;
 
-    public Builder(Instances dataset) {
+    public BoostBuilder(Instances dataset) {
       this.dataset = dataset;
     }
 
-    public Builder(BoostVHTProcessor oldProcessor) {
+    public BoostBuilder() {}
+
+    public BoostBuilder(BoostVHTProcessor oldProcessor) {
       this.dataset = oldProcessor.getDataset();
       this.ensembleSize = oldProcessor.getEnsembleSize();
       this.numberOfClasses = oldProcessor.getNumberOfClasses();
@@ -297,67 +200,63 @@ public class BoostVHTProcessor implements Processor {
       this.gracePeriod = oldProcessor.getGracePeriod();
       this.parallelismHint = oldProcessor.getParallelismHint();
       this.timeOut = oldProcessor.getTimeOut();
-      this.splittingOption = oldProcessor.splittingOption;
+      this.splittingOption = oldProcessor.getSplittingOption();
       this.seed = oldProcessor.getSeed();
     }
 
-    public Builder ensembleSize(int ensembleSize) {
+    public BoostBuilder ensembleSize(int ensembleSize) {
       this.ensembleSize = ensembleSize;
       return this;
     }
 
-    public Builder numberOfClasses(int numberOfClasses) {
+    public BoostBuilder numberOfClasses(int numberOfClasses) {
       this.numberOfClasses = numberOfClasses;
       return this;
     }
 
-    public Builder splitCriterion(SplitCriterion splitCriterion) {
+    public BoostBuilder splitCriterion(SplitCriterion splitCriterion) {
       this.splitCriterion = splitCriterion;
       return this;
     }
 
-    public Builder splitConfidence(double splitConfidence) {
+    public BoostBuilder splitConfidence(double splitConfidence) {
       this.splitConfidence = splitConfidence;
       return this;
     }
 
-    public Builder tieThreshold(double tieThreshold) {
+    public BoostBuilder tieThreshold(double tieThreshold) {
       this.tieThreshold = tieThreshold;
       return this;
     }
 
-    public Builder gracePeriod(int gracePeriod) {
+    public BoostBuilder gracePeriod(int gracePeriod) {
       this.gracePeriod = gracePeriod;
       return this;
     }
 
-    public Builder parallelismHint(int parallelismHint) {
+    public BoostBuilder parallelismHint(int parallelismHint) {
       this.parallelismHint = parallelismHint;
       return this;
     }
 
-    public Builder timeOut(int timeOut) {
+    public BoostBuilder timeOut(int timeOut) {
       this.timeOut = timeOut;
       return this;
     }
 
-    public Builder splittingOption(ActiveLearningNode.SplittingOption splittingOption) {
+    public BoostBuilder splittingOption(ActiveLearningNode.SplittingOption splittingOption) {
       this.splittingOption = splittingOption;
       return this;
     }
 
-    public Builder maxBufferSize(int maxBufferSize) {
+    public BoostBuilder maxBufferSize(int maxBufferSize) {
       this.maxBufferSize= maxBufferSize;
       return this;
     }
 
-    public Builder seed(int seed) {
+    public BoostBuilder seed(int seed) {
       this.seed = seed;
       return this;
-    }
-
-    public BoostVHTProcessor build() {
-      return new BoostVHTProcessor(this);
     }
   }
   
@@ -400,7 +299,11 @@ public class BoostVHTProcessor implements Processor {
   public SplitCriterion getSplitCriterion() {
     return splitCriterion;
   }
-  
+
+
+  public ActiveLearningNode.SplittingOption getSplittingOption() {
+    return splittingOption;
+  }
 
   public Double getSplitConfidence() {
     return splitConfidence;
@@ -442,19 +345,5 @@ public class BoostVHTProcessor implements Processor {
   
   public Instances getDataset() {
     return dataset;
-  }
-  
-  @Override
-  public Processor newProcessor(Processor sourceProcessor) {
-    BoostVHTProcessor originProcessor = (BoostVHTProcessor) sourceProcessor;
-    BoostVHTProcessor newProcessor = new BoostVHTProcessor.Builder(originProcessor).build();
-    // TODO(tvas): Why are the streams handled separately from the rest of the options? Why not handle everything in the
-    // copy Builder?
-    if (originProcessor.getResultStream() != null) {
-      newProcessor.setResultStream(originProcessor.getResultStream());
-      newProcessor.setControlStream(originProcessor.getControlStream());
-      newProcessor.setAttributeStream(originProcessor.getAttributeStream());
-    }
-    return newProcessor;
   }
 }

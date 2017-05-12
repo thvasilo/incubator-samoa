@@ -24,11 +24,7 @@ package org.apache.samoa.learners.classifiers.ensemble;
  * License
  */
 
-import com.github.javacliparser.ClassOption;
-import com.github.javacliparser.Configurable;
-import com.github.javacliparser.FlagOption;
-import com.github.javacliparser.FloatOption;
-import com.github.javacliparser.IntOption;
+import com.github.javacliparser.*;
 import com.google.common.collect.ImmutableSet;
 import org.apache.samoa.core.Processor;
 import org.apache.samoa.instances.Instances;
@@ -43,9 +39,12 @@ import org.apache.samoa.moa.classifiers.core.attributeclassobservers.NumericAttr
 import org.apache.samoa.moa.classifiers.core.splitcriteria.SplitCriterion;
 import org.apache.samoa.topology.Stream;
 import org.apache.samoa.topology.TopologyBuilder;
+import org.apache.samoa.learners.classifiers.ensemble.BoostVHTProcessor.BoostBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.security.InvalidAlgorithmParameterException;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -108,6 +107,9 @@ public class BoostVHT implements ClassificationLearner, Configurable {
   public IntOption seedOption = new IntOption("seed", 'u',
       "the seed for the rng.", (int) System.currentTimeMillis());
 
+  public StringOption boosterOption = new StringOption("boostingAlgo", 'a',
+      "The boosting algorithm to use, options: OzaBoost, OnlineBBM", "OzaBoost");
+
   /** The Model Aggregator boosting processor. */
   private BoostVHTProcessor boostVHTProcessor;
 
@@ -139,14 +141,13 @@ public class BoostVHT implements ClassificationLearner, Configurable {
 
     int ensembleSize = this.ensembleSizeOption.getValue();
 
-    // Set parameters for BoostVHT processor, and the BoostMA processors within.
     try {
-      boostVHTProcessor = new BoostVHTProcessor.Builder(dataset)
+      BoostBuilder boostBuilder = new BoostBuilder(dataset)
           .ensembleSize(this.ensembleSizeOption.getValue())
           .numberOfClasses(this.numberOfClassesOption.getValue())
           .splitCriterion(
               (SplitCriterion) ClassOption.createObject(this.splitCriterionOption.getValueAsCLIString(),
-              this.splitCriterionOption.getRequiredType()))
+                  this.splitCriterionOption.getRequiredType()))
           .splitConfidence(this.splitConfidenceOption.getValue())
           .tieThreshold(this.tieThresholdOption.getValue())
           .gracePeriod(this.gracePeriodOption.getValue())
@@ -154,8 +155,28 @@ public class BoostVHT implements ClassificationLearner, Configurable {
           .timeOut(this.timeOutOption.getValue())
           .splittingOption(this.splittingOption.isSet() ? SplittingOption.KEEP: SplittingOption.THROW_AWAY)
           .maxBufferSize(this.maxBufferSizeOption.getValue())
-          .seed(this.seedOption.getValue())
-          .build();
+          .seed(this.seedOption.getValue());
+      if (Objects.equals(boosterOption.getValue(), "OzaBoost")) {
+        System.out.println("Using OzaBoost");
+        boostVHTProcessor = new OzaBoost.OzaBoostBuilder(boostBuilder)
+            .build();
+      } else if (Objects.equals(boosterOption.getValue(), "OnlineBBM")) {
+        System.out.println("Using OnlineBBM");
+        boostVHTProcessor = new OnlineBBM.OnlineBBMBuilder(boostBuilder)
+            .build();
+      } else if (Objects.equals(boosterOption.getValue(), "Logistic")){
+        System.out.println("Using Logistic");
+        boostVHTProcessor = new Logistic.LogisticBoostBuilder(boostBuilder)
+            .build();
+      } else if (Objects.equals(boosterOption.getValue(), "OSBoost")){
+        System.out.println("Using OSBoost");
+        boostVHTProcessor = new OSBoost.OSBoostBuilder(boostBuilder)
+            .build();
+      } else {
+        throw new InvalidAlgorithmParameterException(
+            "Incorrect selection for boosting algorithm: " + boosterOption.getValue());
+      }
+
     } catch (Exception e) {
       e.printStackTrace();
     }
