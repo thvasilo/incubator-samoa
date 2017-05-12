@@ -112,9 +112,16 @@ public final class LocalStatisticsProcessor implements Processor {
     // Doing this sort instead of keeping the max and second max seems faster for some reason
     Arrays.sort(suggestions);
 
-    AttributeSplitSuggestion bestSuggestion = suggestions[suggestions.length - 1];
-    AttributeSplitSuggestion secondBestSuggestion = suggestions[suggestions.length - 2];
+    AttributeSplitSuggestion bestSuggestion = null;
+    AttributeSplitSuggestion secondBestSuggestion = null;
 
+    if (suggestions.length >= 1) {
+      bestSuggestion = suggestions[suggestions.length - 1];
+
+      if (suggestions.length >= 2) {
+        secondBestSuggestion = suggestions[suggestions.length - 2];
+      }
+    }
     // create the local result content event
     LocalResultContentEvent lcre =
         new LocalResultContentEvent(cce.getSplitId(), bestSuggestion, secondBestSuggestion);
