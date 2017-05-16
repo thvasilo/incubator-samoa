@@ -86,7 +86,7 @@ public class DenseInstanceData implements InstanceData {
 
   @Override
   public double[] toDoubleArray() {
-    return attributeValues.clone();
+    return attributeValues;
   }
 
   @Override
