@@ -22,6 +22,7 @@ package org.apache.samoa.learners.classifiers.ensemble;
 
 import org.apache.samoa.core.ContentEvent;
 import org.apache.samoa.core.Processor;
+import org.apache.samoa.instances.Attribute;
 import org.apache.samoa.instances.Instance;
 import org.apache.samoa.instances.Instances;
 import org.apache.samoa.instances.InstancesHeader;
@@ -111,6 +112,9 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
   private String datapath = "/home/tvas/output/covtype";
   private PrintStream metadataStream = null;
   private boolean firstEvent = true;
+
+  private boolean[] isAttributeNominal;
+  private boolean isInit = false;
   
   
   private double weightSeenByModel = 0.0;
@@ -150,6 +154,17 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
   }
 
   public void trainOnInstance(Instance inst) {
+    if (!isInit) {
+      isAttributeNominal = new boolean[inst.numAttributes() - 1];
+      for (int i = 0; i < inst.numAttributes() - 1; i++) {
+        Attribute att = inst.attribute(i);
+        if (att.isNominal()) {
+          isAttributeNominal[i] = true;
+        }
+      }
+      isInit = true;
+    }
+
     if (this.treeRoot == null) {
       this.treeRoot = newLearningNode(this.parallelismHint);
       this.activeLeafNodeCount = 1;
@@ -457,8 +472,8 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
     // for VHT optimization, we need to dynamically instantiate the appropriate
     // ActiveLearningNode
     ActiveLearningNode newNode = new ActiveLearningNode(initialClassObservations, parallelismHint,
-        this.splittingOption, this.maxBufferSize);
-    newNode.setEnsembleId(this.processorId);
+        splittingOption, maxBufferSize, isAttributeNominal);
+    newNode.setEnsembleId(processorId);
     return newNode;
   }
 

@@ -34,9 +34,13 @@ import org.slf4j.LoggerFactory;
 
 public final class ActiveLearningNode extends LearningNode {
   /**
-	 *
-	 */
-  public enum SplittingOption {THROW_AWAY, KEEP};
+   *
+   */
+  public enum SplittingOption {
+    THROW_AWAY, KEEP
+  }
+
+  ;
 
   private static final long serialVersionUID = -2892102872646338908L;
   private static final Logger logger = LoggerFactory.getLogger(ActiveLearningNode.class);
@@ -61,7 +65,11 @@ public final class ActiveLearningNode extends LearningNode {
 
   private boolean isSplitting;
 
-  public ActiveLearningNode(double[] classObservation, int parallelismHint, SplittingOption splitOption, int maxBufferSize) {
+  private boolean[] isAttributeNominal;
+  private int sliceSize;
+
+
+  public ActiveLearningNode(double[] classObservation, int parallelismHint, SplittingOption splitOption, int maxBufferSize, boolean[] isAttributeNominal) {
     super(classObservation);
     this.weightSeenAtLastSplitEvaluation = this.getWeightSeen();
     this.id = VerticalHoeffdingTree.LearningNodeIdGenerator.generate();
@@ -71,6 +79,8 @@ public final class ActiveLearningNode extends LearningNode {
     this.splittingOption = splitOption;
     this.maxBufferSize = maxBufferSize;
     this.buffer = EvictingQueue.create(maxBufferSize); // new ArrayDeque<>(maxBufferSize)
+    this.isAttributeNominal = isAttributeNominal;
+    sliceSize = isAttributeNominal.length / parallelismHint;
   }
 
   public long getId() {
@@ -97,8 +107,8 @@ public final class ActiveLearningNode extends LearningNode {
           return;
         case KEEP:
           //logger.trace("node {}: keep instance with max buffer size: {}, continue sending to local stats", this.id, this.maxBufferSize);
-            //logger.trace("node {}: add to buffer", this.id);
-            buffer.add(inst);
+          //logger.trace("node {}: add to buffer", this.id);
+          buffer.add(inst);
           break;
         default:
           logger.error("node {}: invalid splittingOption option: {}", this.id, this.splittingOption);
@@ -113,27 +123,18 @@ public final class ActiveLearningNode extends LearningNode {
     // like being smarter about how we update the observers.
     this.observedClassDistribution.addToValue((int) inst.classValue(),
         inst.weight());
-    double[] attributeArray =  inst.toDoubleArray();
-    int sliceSize = (attributeArray.length - 1) / parallelismHint;
-    boolean[] isNominalAll = new boolean[inst.numAttributes() - 1];
-    // First we run through all the attributes to see which are nominal. We really should only be doing this once...
-    for (int i = 0; i < inst.numAttributes() - 1; i++) {
-      Attribute att = inst.attribute(i);
-      if (att.isNominal()) {
-        isNominalAll[i] = true;
-      }
-    }
+    double[] attributeArray = inst.toDoubleArray();
     int startingIndex = 0;
     // Then we run through the number of local stats processors to send one attribute slice message to each
     for (int localStatsIndex = 0; localStatsIndex < parallelismHint; localStatsIndex++) {
       // The endpoint for the slice is either the end of the previous slice, or the end of the array
       // TODO: Note that we assume class is at the end of the instance attribute array, hence the length-1 here
       // We can do proper handling later
-      int endpoint = localStatsIndex == (parallelismHint - 1) ? (attributeArray.length-1) : (localStatsIndex + 1) * sliceSize;
+      int endpoint = localStatsIndex == (parallelismHint - 1) ? (attributeArray.length - 1) : (localStatsIndex + 1) * sliceSize;
       double[] attributeSlice = Arrays.copyOfRange(
           attributeArray, localStatsIndex * sliceSize, endpoint);
       boolean[] isNominalSlice = Arrays.copyOfRange(
-          isNominalAll, localStatsIndex * sliceSize, endpoint);
+          isAttributeNominal, localStatsIndex * sliceSize, endpoint);
       AttributeSliceEvent attributeSliceEvent = new AttributeSliceEvent(
           this.id, startingIndex, Integer.toString(localStatsIndex), isNominalSlice, attributeSlice,
           (int) inst.classValue(), inst.weight());
@@ -238,7 +239,7 @@ public final class ActiveLearningNode extends LearningNode {
   public int getEnsembleId() {
     return ensembleId;
   }
-  
+
   public void setEnsembleId(int ensembleId) {
     this.ensembleId = ensembleId;
   }
