@@ -23,13 +23,15 @@ import org.apache.samoa.core.ContentEvent;
 
 public class AttributeSliceEvent implements ContentEvent{
   private static final long serialVersionUID = 6752449086753238767L;
-  private final long learningNodeId;
-  private final int attributeStartingIndex;
-  private final transient String key;
-  private final boolean[] isNominalSlice;
-  private final double[] attributeSlice;
-  private final int classValue;
-  private final double weight;
+  private long learningNodeId;
+  private int attributeStartingIndex;
+  private String key;
+  private boolean[] isNominalSlice;
+  private double[] attributeSlice;
+  private int classValue;
+  private double weight;
+
+  public AttributeSliceEvent() {}
 
   public AttributeSliceEvent(
       long learningNodeId, int attributeStartingIndex, String key, boolean[] isNominalSlice, double[] attributeSlice,
