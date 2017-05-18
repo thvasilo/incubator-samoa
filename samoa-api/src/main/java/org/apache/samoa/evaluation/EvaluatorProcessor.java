@@ -90,10 +90,10 @@ public class EvaluatorProcessor implements Processor {
 
     if ((totalCount > 0) && (totalCount % samplingFrequency) == 0) {
       long sampleEnd = System.nanoTime();
-      sampleDuration = TimeUnit.SECONDS.convert(sampleEnd - sampleStart, TimeUnit.NANOSECONDS);
+      sampleDuration = TimeUnit.MILLISECONDS.convert(sampleEnd - sampleStart, TimeUnit.NANOSECONDS);
       sampleDurationInNanoseconds = sampleEnd - sampleStart;
       sampleStart = sampleEnd;
-      logger.info("{} seconds for {} instances", sampleDuration, samplingFrequency);
+      logger.info("{} milliseconds for {} instances", sampleDuration, samplingFrequency);
       this.addMeasurement();
     }
 
@@ -211,8 +211,8 @@ public class EvaluatorProcessor implements Processor {
     logger.info(learningCurveSummary);
 
     long experimentEnd = System.nanoTime();
-    long totalExperimentTime = TimeUnit.SECONDS.convert(experimentEnd - experimentStart, TimeUnit.NANOSECONDS);
-    logger.info("total evaluation time: {} seconds for {} instances", totalExperimentTime, totalCount);
+    long totalExperimentTime = TimeUnit.MILLISECONDS.convert(experimentEnd - experimentStart, TimeUnit.NANOSECONDS);
+    logger.info("total evaluation time: {} milliseconds for {} instances", totalExperimentTime, totalCount);
 
     if (immediateResultStream != null) {
       immediateResultStream.println("# COMPLETED");
