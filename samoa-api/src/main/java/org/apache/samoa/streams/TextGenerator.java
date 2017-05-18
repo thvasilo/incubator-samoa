@@ -39,11 +39,11 @@ public class TextGenerator extends AbstractOptionHandler implements InstanceStre
     private static final long serialVersionUID = 3028905554604259131L;
 
     public IntOption numAttsOption = new IntOption("numAtts", 'a',
-            "The number of attributes to generate.", 1000, 0, Integer.MAX_VALUE);
+        "The number of attributes to generate.", 1000, 0, Integer.MAX_VALUE);
 
     public IntOption instanceRandomSeedOption = new IntOption(
-            "instanceRandomSeed", 'i',
-            "Seed for random generation of instances.", 1);
+        "instanceRandomSeed", 'i',
+        "Seed for random generation of instances.", 1);
 
     protected InstancesHeader streamHeader;
 
@@ -109,7 +109,7 @@ public class TextGenerator extends AbstractOptionHandler implements InstanceStre
             }
         } while (votes[1] == votes[2]);
 
-        Instance inst = new DenseInstance(1.0, attVals);
+        Instance inst = new SparseInstance(1.0, attVals);
         inst.setDataset(getHeader());
         inst.setClassValue((votes[1] > votes[2]) ? 0 : 1);
         this.countTweets++;
@@ -172,7 +172,7 @@ public class TextGenerator extends AbstractOptionHandler implements InstanceStre
         }
         attributes.add(new Attribute("class", classLabels));
         this.streamHeader = new InstancesHeader(new Instances(
-                getCLICreationString(InstanceStream.class), attributes, 0));
+            getCLICreationString(InstanceStream.class), attributes, 0));
         this.streamHeader.setClassIndex(this.streamHeader.numAttributes() - 1);
     }
 
