@@ -65,6 +65,9 @@ public final class LocalStatisticsProcessor implements Processor {
   private final AttributeClassObserver nominalClassObserver;
   private final AttributeClassObserver numericClassObserver;
   private int id;
+  private long attSliceMillis = 0;
+  private long computeEventMillis = 0;
+  private long sliceCount = 0;
 
   // the two observer classes below are also needed to be setup from the Tree
   private LocalStatisticsProcessor(Builder builder) {
@@ -74,18 +77,37 @@ public final class LocalStatisticsProcessor implements Processor {
     this.numericClassObserver = builder.numericClassObserver;
   }
 
+  private long timeUnit() {
+    return System.currentTimeMillis();
+  }
+
   @Override
   public boolean process(ContentEvent event) {
 
+    long start = timeUnit();
+
     if (event instanceof AttributeSliceEvent) {
+      sliceCount++;
+      if (sliceCount % 10_000 == 0) {
+        attSliceMillis = 0;
+        computeEventMillis = 0;
+      }
       AttributeSliceEvent ase = (AttributeSliceEvent) event;
       processAttributeSlice(ase);
-
+      long attSliceEnd = timeUnit();
+      attSliceMillis += (attSliceEnd - start);
     } else {
       ComputeContentEvent cce = (ComputeContentEvent) event;
       processComputeEvent(cce);
-
+      long computeEventEnd = timeUnit();
+      computeEventMillis += (computeEventEnd - start);
     }
+
+//    if (sliceCount % 10_000 == 0) {
+//      System.out.printf("LSP %d: Slice millis: %d, compute millis: %d%n", id,
+//          attSliceMillis,
+//          computeEventMillis);
+//    }
     return true;
   }
 
@@ -124,7 +146,7 @@ public final class LocalStatisticsProcessor implements Processor {
     }
     // create the local result content event
     LocalResultContentEvent lcre =
-        new LocalResultContentEvent(cce.getSplitId(), bestSuggestion, secondBestSuggestion);
+        new LocalResultContentEvent(id, cce.getSplitId(), bestSuggestion, secondBestSuggestion, attSliceMillis, computeEventMillis);
     lcre.setEnsembleId(cce.getEnsembleId()); //faye boostVHT
     computationResultStream.put(lcre);
   }

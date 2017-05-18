@@ -20,9 +20,11 @@ package org.apache.samoa.learners.classifiers.ensemble;
  * #L%
  */
 
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 import org.apache.samoa.core.ContentEvent;
 import org.apache.samoa.core.Processor;
-import org.apache.samoa.instances.Instance;
 import org.apache.samoa.instances.Instances;
 import org.apache.samoa.learners.InstanceContentEvent;
 import org.apache.samoa.learners.ResultContentEvent;
@@ -30,11 +32,12 @@ import org.apache.samoa.learners.classifiers.trees.ActiveLearningNode;
 import org.apache.samoa.learners.classifiers.trees.LocalResultContentEvent;
 import org.apache.samoa.moa.classifiers.core.splitcriteria.InfoGainSplitCriterion;
 import org.apache.samoa.moa.classifiers.core.splitcriteria.SplitCriterion;
-import org.apache.samoa.moa.core.DoubleVector;
 import org.apache.samoa.topology.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Random;
 
 /**
@@ -86,11 +89,16 @@ abstract public class BoostVHTProcessor implements Processor {
   protected int seed;
 
   
-  protected double trainingWeightSeenByModel; //todo:: (Faye) when is this updated?
+  protected double trainingWeightSeenByModel;
 
   protected int numberOfClasses;
 
   protected int maxBufferSize;
+
+  private Map<Integer, Pair<Long, Long>> timings;
+  private long instancesSeen = 0;
+  private DescriptiveStatistics sliceOverallMeans;
+  private DescriptiveStatistics computeOverallMeans;
 
   public BoostVHTProcessor() {}
 
@@ -103,6 +111,7 @@ abstract public class BoostVHTProcessor implements Processor {
   public boolean process(ContentEvent event) {
 
     if (event instanceof InstanceContentEvent) {
+      instancesSeen++;
       InstanceContentEvent inEvent = (InstanceContentEvent) event;
       //todo:: (Faye) check if any precondition is needed
 
@@ -111,10 +120,33 @@ abstract public class BoostVHTProcessor implements Processor {
 
       // estimate model parameters using the training data
       train(inEvent);
+      if (instancesSeen % 10_000 == 0 || inEvent.isLastEvent()) {
+        DescriptiveStatistics sliceStats = new DescriptiveStatistics();
+        DescriptiveStatistics computeStats = new DescriptiveStatistics();
+        for (Pair<Long, Long> entry : timings.values()) {
+          sliceStats.addValue(entry.getLeft());
+          computeStats.addValue(entry.getRight());
+        }
+
+        System.out.printf("Avg slice millis: %f, avg compute millis: %f%n",
+            sliceStats.getMean(),
+            computeStats.getMean());
+        System.out.printf("95%% slice millis: %f, 95%% compute millis: %f%n",
+            sliceStats.getPercentile(95),
+            computeStats.getPercentile(95));
+        sliceOverallMeans.addValue(sliceStats.getMean());
+        computeOverallMeans.addValue(computeStats.getMean());
+        System.out.printf("Mean avg slice millis: %f, mean avg compute millis: %f%n",
+            sliceOverallMeans.getMean(),
+            computeOverallMeans.getMean());
+      }
     } else if (event instanceof LocalResultContentEvent) {
       LocalResultContentEvent lrce = (LocalResultContentEvent) event;
       mAPEnsemble[lrce.getEnsembleId()].updateModel(lrce);
+      timings.put(lrce.getLocalStatsId(), new ImmutablePair<>(lrce.getAttSliceMillis(), lrce.getComputeEventMillis()));
     }
+
+
 
     return true;
   }
@@ -145,6 +177,9 @@ abstract public class BoostVHTProcessor implements Processor {
       newProc.setControlStream(this.controlStream);
       mAPEnsemble[i] = newProc;
     }
+    timings = new HashMap<>(parallelismHint);
+    sliceOverallMeans = new DescriptiveStatistics();
+    computeOverallMeans = new DescriptiveStatistics();
   }
 
   abstract protected double[] predict(InstanceContentEvent inEvent);

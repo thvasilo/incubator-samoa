@@ -76,7 +76,7 @@ public class OzaBoost extends BoostVHTProcessor {
   protected void train(InstanceContentEvent inEvent) {
     Instance trainInstance = inEvent.getInstance();
 
-    this.trainingWeightSeenByModel += trainInstance.weight();
+    this.trainingWeightSeenByModel++;
     double lambda_d = 1.0;
 
     for (int i = 0; i < ensembleSize; i++) { //for each base model
