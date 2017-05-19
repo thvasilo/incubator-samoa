@@ -120,7 +120,7 @@ abstract public class BoostVHTProcessor implements Processor {
 
       // estimate model parameters using the training data
       train(inEvent);
-      if (instancesSeen % 10_000 == 0 || inEvent.isLastEvent()) {
+      if ((instancesSeen % 10_000 == 0 || inEvent.isLastEvent()) && !timings.isEmpty()) {
         DescriptiveStatistics sliceStats = new DescriptiveStatistics();
         DescriptiveStatistics computeStats = new DescriptiveStatistics();
         for (Pair<Long, Long> entry : timings.values()) {
@@ -128,15 +128,15 @@ abstract public class BoostVHTProcessor implements Processor {
           computeStats.addValue(entry.getRight());
         }
 
-        System.out.printf("Avg slice millis: %f, avg compute millis: %f%n",
+        logger.info("Avg slice millis: {}, avg compute millis: {}",
             sliceStats.getMean(),
             computeStats.getMean());
-        System.out.printf("95%% slice millis: %f, 95%% compute millis: %f%n",
+        logger.info("95%% slice millis: {}, 95%% compute millis: {}",
             sliceStats.getPercentile(95),
             computeStats.getPercentile(95));
         sliceOverallMeans.addValue(sliceStats.getMean());
         computeOverallMeans.addValue(computeStats.getMean());
-        System.out.printf("Mean avg slice millis: %f, mean avg compute millis: %f%n",
+        logger.info("Mean avg slice millis: {}, mean avg compute millis: {}",
             sliceOverallMeans.getMean(),
             computeOverallMeans.getMean());
       }
