@@ -101,6 +101,8 @@ public class OSBoost extends BoostVHTProcessor {
   @Override
   protected void train(InstanceContentEvent inEvent) {
     Instance trainInstance = inEvent.getInstance();
+    long instanceIndex = inEvent.getInstanceIndex();
+
 
     trainingWeightSeenByModel++;
     double z = 0;
@@ -114,7 +116,7 @@ public class OSBoost extends BoostVHTProcessor {
       if (weight > 0) {
         Instance weightedInstance = trainInstance.copy();
         weightedInstance.setWeight(trainInstance.weight() * weight);
-        mAPEnsemble[i].trainOnInstance(weightedInstance);
+        mAPEnsemble[i].trainOnInstance(weightedInstance, instanceIndex);
       }
       if (z > 0) {
         weight = FastMath.pow(1.0 - gamma, z / 2.0);

@@ -146,19 +146,19 @@ public class BoostVHT implements ClassificationLearner, Configurable {
 
     try {
       BoostBuilder boostBuilder = new BoostBuilder(dataset)
-          .ensembleSize(this.ensembleSizeOption.getValue())
-          .numberOfClasses(this.numberOfClassesOption.getValue())
+          .ensembleSize(ensembleSize)
+          .numberOfClasses(numberOfClassesOption.getValue())
           .splitCriterion(
-              (SplitCriterion) ClassOption.createObject(this.splitCriterionOption.getValueAsCLIString(),
-                  this.splitCriterionOption.getRequiredType()))
-          .splitConfidence(this.splitConfidenceOption.getValue())
-          .tieThreshold(this.tieThresholdOption.getValue())
-          .gracePeriod(this.gracePeriodOption.getValue())
+              (SplitCriterion) ClassOption.createObject(splitCriterionOption.getValueAsCLIString(),
+                  splitCriterionOption.getRequiredType()))
+          .splitConfidence(splitConfidenceOption.getValue())
+          .tieThreshold(tieThresholdOption.getValue())
+          .gracePeriod(gracePeriodOption.getValue())
           .parallelismHint(numLocalStats.getValue())
-          .timeOut(this.timeOutOption.getValue())
-          .splittingOption(this.splittingOption.isSet() ? SplittingOption.KEEP: SplittingOption.THROW_AWAY)
-          .maxBufferSize(this.maxBufferSizeOption.getValue())
-          .seed(this.seedOption.getValue());
+          .timeOut(timeOutOption.getValue())
+          .splittingOption(splittingOption.isSet() ? SplittingOption.KEEP: SplittingOption.THROW_AWAY)
+          .maxBufferSize(maxBufferSizeOption.getValue())
+          .seed(seedOption.getValue());
       if (Objects.equals(boosterOption.getValue(), "OzaBoost")) {
         System.out.println("Using OzaBoost");
         boostVHTProcessor = new OzaBoost.OzaBoostBuilder(boostBuilder)
@@ -199,6 +199,7 @@ public class BoostVHT implements ClassificationLearner, Configurable {
         .binarySplit(this.binarySplitsOption.isSet())
         .nominalClassObserver((AttributeClassObserver) this.nominalEstimatorOption.getValue())
         .numericClassObserver((AttributeClassObserver) this.numericEstimatorOption.getValue())
+        .numBoostingStages(ensembleSize)
         .build();
     
     this.topologyBuilder.addProcessor(locStatProcessor, numLocalStats.getValue());
@@ -226,7 +227,7 @@ public class BoostVHT implements ClassificationLearner, Configurable {
 
     Stream timingsStream = topologyBuilder.createStream(locStatProcessor);
     locStatProcessor.setTimingsStream(timingsStream);
-    topologyBuilder.connectInputAllStream(timingsStream, timingsProcessor);
+    topologyBuilder.connectInputShuffleStream(timingsStream, timingsProcessor);
 
   }
 

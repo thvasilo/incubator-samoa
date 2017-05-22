@@ -73,6 +73,8 @@ public class OnlineBBM extends BoostVHTProcessor {
     // TODO: The algorithm assumes a label domain of -1/1. Will need to take that into consideration
     double s = 0;
     Instance trainInstance = inEvent.getInstance();
+    long instanceIndex = inEvent.getInstanceIndex();
+
     this.trainingWeightSeenByModel++;
     for (int i = 0; i < ensembleSize; i++) {
       int k = (int) FastMath.floor((ensembleSize - i - s) / 2);
@@ -106,7 +108,7 @@ public class OnlineBBM extends BoostVHTProcessor {
       if (weight > 0) {
         Instance weightedInstance = trainInstance.copy();
         weightedInstance.setWeight(trainInstance.weight() * weight);
-        mAPEnsemble[i].trainOnInstance(weightedInstance);
+        mAPEnsemble[i].trainOnInstance(weightedInstance, instanceIndex);
       }
     }
   }

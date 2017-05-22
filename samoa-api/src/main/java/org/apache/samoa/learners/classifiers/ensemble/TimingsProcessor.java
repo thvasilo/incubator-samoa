@@ -59,13 +59,14 @@ public class TimingsProcessor implements Processor {
     // we calculate its overall statistics and print them out.
     // TODO: If by the end of the stream we haven't collected stats from all, we should prolly just print the remainder
     TimingsEvent tevent = (TimingsEvent) event;
-    Integer rowID = tevent.getMeasurementID();
-    Integer colID = tevent.getLocalStatsID();
+    Integer measurementID = tevent.getMeasurementID();
+    Integer localStatsID = tevent.getLocalStatsID();
+    // TODO: Perhaps it would make sense to separate these two
     Long measurement = tevent.getAttSliceMillis() + tevent.getComputeEventMillis();
 
     // Get the correct row from the table
-    Map<Integer, Long> localMeasurements = timings.row(rowID);
-    localMeasurements.put(colID, measurement);
+    Map<Integer, Long> localMeasurements = timings.row(measurementID);
+    localMeasurements.put(localStatsID, measurement);
 
     if (localMeasurements.size() == numLocalStats) {
       DescriptiveStatistics rowStats = new DescriptiveStatistics();
@@ -73,15 +74,15 @@ public class TimingsProcessor implements Processor {
         rowStats.addValue(value);
       }
       double rowMean = rowStats.getMean();
-      logger.info("Avg slice millis: {}",
-          rowMean);
+      logger.info("Measurement: {} Avg slice millis: {}",
+          measurementID, rowMean);
       logger.info("95%% slice millis: {}",
           rowStats.getPercentile(95));
       meanStats.addValue(rowMean);
       logger.info("Mean avg slice millis: {}",
           meanStats.getMean());
       // We are done with this measurement instance, so we can remove it
-      timings.row(rowID).clear();
+      timings.row(measurementID).clear();
     }
     // TODO: Handle case where we didn't manage to collect stats from all local stats processors at the end of the stream
 

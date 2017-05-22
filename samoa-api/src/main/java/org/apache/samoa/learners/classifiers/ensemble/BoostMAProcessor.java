@@ -153,7 +153,7 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
     this.executor = Executors.newScheduledThreadPool(8);
   }
 
-  public void trainOnInstance(Instance inst) {
+  public void trainOnInstance(Instance inst, long instanceIndex) {
     if (!isInit) {
       isAttributeNominal = new boolean[inst.numAttributes() - 1];
       for (int i = 0; i < inst.numAttributes() - 1; i++) {
@@ -171,7 +171,7 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
 
     }
     FoundNode foundNode = this.treeRoot.filterInstanceToLeaf(inst, null, -1);
-    trainLeaf(foundNode, inst);
+    trainLeaf(foundNode, inst, instanceIndex);
   }
 
   public void updateModel(LocalResultContentEvent lrce ) {
@@ -196,7 +196,7 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
     throw new NotImplementedException();
   }
 
-  private void trainLeaf(FoundNode foundNode, Instance inst) {
+  private void trainLeaf(FoundNode foundNode, Instance inst, long instanceIndex) {
 
     Node leafNode = foundNode.getNode();
 
@@ -208,7 +208,7 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
 
     if (leafNode instanceof LearningNode) {
       LearningNode learningNode = (LearningNode) leafNode;
-      learningNode.learnFromInstance(inst, this);
+      learningNode.learnFromInstance(inst, this, instanceIndex);
     }
 
     if (leafNode instanceof ActiveLearningNode) {
@@ -430,7 +430,9 @@ public final class BoostMAProcessor implements ModelAggregator, Processor {
           Queue<Instance> buffer = activeLearningNode.getBuffer();
 //          logger.debug("node: {}. split is happening, there are {} items in buffer", activeLearningNode.getId(), buffer.size());
           while(!buffer.isEmpty()) {
-            this.trainOnInstance(buffer.poll());
+            // TODO: Buffer should perhaps store InstanceContentEvents instead, s.t. we know the proper instance
+            Instance bufferedInst = buffer.poll();
+            this.trainOnInstance(bufferedInst, -2L);
           }
         }
       }

@@ -30,12 +30,14 @@ public class AttributeSliceEvent implements ContentEvent{
   private double[] attributeSlice;
   private int classValue;
   private double weight;
+  private long instanceIndex;
 
   public AttributeSliceEvent() {}
 
   public AttributeSliceEvent(
-      long learningNodeId, int attributeStartingIndex, String key, boolean[] isNominalSlice, double[] attributeSlice,
+      long instanceIndex, long learningNodeId, int attributeStartingIndex, String key, boolean[] isNominalSlice, double[] attributeSlice,
       int classValue, double weight) {
+    this.instanceIndex = instanceIndex;
     this.learningNodeId = learningNodeId;
     this.attributeStartingIndex = attributeStartingIndex;
     this.key = key;
@@ -43,6 +45,10 @@ public class AttributeSliceEvent implements ContentEvent{
     this.attributeSlice = attributeSlice;
     this.classValue = classValue;
     this.weight = weight;
+  }
+
+  public long getInstanceIndex() {
+    return instanceIndex;
   }
 
   public int getClassValue() {

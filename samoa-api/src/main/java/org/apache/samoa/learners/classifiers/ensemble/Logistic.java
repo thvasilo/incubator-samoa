@@ -87,6 +87,8 @@ public class Logistic extends BoostVHTProcessor {
   protected void train(InstanceContentEvent inEvent) {
     double s = 0;
     Instance trainInstance = inEvent.getInstance();
+    long instanceIndex = inEvent.getInstanceIndex();
+
 
     trainingWeightSeenByModel++;
     double eta = 4.0 / FastMath.sqrt(trainingWeightSeenByModel);
@@ -114,7 +116,7 @@ public class Logistic extends BoostVHTProcessor {
       if (weight > 0) {
         Instance weightedInstance = trainInstance.copy();
         weightedInstance.setWeight(trainInstance.weight() * weight);
-        mAPEnsemble[i].trainOnInstance(weightedInstance);
+        mAPEnsemble[i].trainOnInstance(weightedInstance, instanceIndex);
       }
     }
 

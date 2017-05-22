@@ -45,6 +45,8 @@ public abstract class LearningNode extends Node {
    */
   public abstract void learnFromInstance(Instance inst, ModelAggregator proc);
 
+  public abstract void learnFromInstance(Instance inst, ModelAggregator proc, long instanceIndex);
+
   @Override
   protected boolean isLeaf() {
     return true;

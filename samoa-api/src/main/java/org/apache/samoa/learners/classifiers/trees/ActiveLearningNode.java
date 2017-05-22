@@ -23,6 +23,7 @@ package org.apache.samoa.learners.classifiers.trees;
 import java.util.*;
 
 import com.google.common.collect.EvictingQueue;
+import org.apache.commons.lang.NotImplementedException;
 import org.apache.samoa.instances.Attribute;
 import org.apache.samoa.learners.classifiers.ModelAggregator;
 import org.apache.samoa.instances.Instance;
@@ -97,8 +98,7 @@ public final class ActiveLearningNode extends LearningNode {
     this.attributeBatchContentEvent = attributeBatchContentEvent;
   }
 
-  @Override
-  public void learnFromInstance(Instance inst, ModelAggregator proc) {
+  public void learnFromInstance(Instance inst, ModelAggregator proc, long instanceIndex) {
     if (isSplitting) {
       switch (this.splittingOption) {
         case THROW_AWAY:
@@ -136,11 +136,16 @@ public final class ActiveLearningNode extends LearningNode {
       boolean[] isNominalSlice = Arrays.copyOfRange(
           isAttributeNominal, localStatsIndex * sliceSize, endpoint);
       AttributeSliceEvent attributeSliceEvent = new AttributeSliceEvent(
-          this.id, startingIndex, Integer.toString(localStatsIndex), isNominalSlice, attributeSlice,
+          instanceIndex, id, startingIndex, Integer.toString(localStatsIndex), isNominalSlice, attributeSlice,
           (int) inst.classValue(), inst.weight());
       proc.sendToAttributeStream(attributeSliceEvent);
       startingIndex = endpoint;
     }
+  }
+
+  @Override
+  public void learnFromInstance(Instance inst, ModelAggregator proc) {
+    throw new NotImplementedException("Should only be using learnFromInstance with the instance index arg!");
   }
 
   @Override

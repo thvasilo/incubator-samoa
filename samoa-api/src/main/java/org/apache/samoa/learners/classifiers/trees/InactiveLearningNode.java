@@ -48,6 +48,12 @@ public final class InactiveLearningNode extends LearningNode {
   }
 
   @Override
+  public void learnFromInstance(Instance inst, ModelAggregator proc, long instanceIndex) {
+    this.observedClassDistribution.addToValue(
+        (int) inst.classValue(), inst.weight());
+  }
+
+  @Override
   public double[] getClassVotes(Instance inst, ModelAggregator map) {
     return this.observedClassDistribution.getArrayCopy();
   }

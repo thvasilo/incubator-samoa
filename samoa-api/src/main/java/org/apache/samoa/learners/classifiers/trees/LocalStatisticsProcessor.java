@@ -20,8 +20,7 @@ package org.apache.samoa.learners.classifiers.trees;
  * #L%
  */
 
-import java.util.Arrays;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
 
 import org.apache.samoa.core.ContentEvent;
@@ -66,12 +65,15 @@ public final class LocalStatisticsProcessor implements Processor {
   private final AttributeClassObserver nominalClassObserver;
   private final AttributeClassObserver numericClassObserver;
   private int id;
+  private int numBoostingStages;
   private long attSliceMillis = 0;
   private long computeEventMillis = 0;
+  private long instanceCount = 0;
   private long sliceCount = 0;
   private int measurementCount = 0;
   private Stream timingsStream;
   private int reportingIncrement = 1000; // TODO: Make configurable
+  private Set<Long> instancesSeen = new HashSet<>();
 
   // the two observer classes below are also needed to be setup from the Tree
   private LocalStatisticsProcessor(Builder builder) {
@@ -79,6 +81,7 @@ public final class LocalStatisticsProcessor implements Processor {
     this.binarySplit = builder.binarySplit;
     this.nominalClassObserver = builder.nominalClassObserver;
     this.numericClassObserver = builder.numericClassObserver;
+    this.numBoostingStages = builder.numBoostingStages;
   }
 
   private long timeUnit() {
@@ -92,8 +95,14 @@ public final class LocalStatisticsProcessor implements Processor {
 
     if (event instanceof AttributeSliceEvent) {
       sliceCount++;
-      if (sliceCount % reportingIncrement == 0) {
-        measurementCount++;
+      AttributeSliceEvent ase = (AttributeSliceEvent) event;
+      processAttributeSlice(ase);
+      long attSliceEnd = timeUnit();
+      attSliceMillis += (attSliceEnd - start);
+      long instanceIndex = ase.getInstanceIndex();
+      instancesSeen.add(instanceIndex);
+
+      if (instancesSeen.size() % reportingIncrement == 0) {
         TimingsEvent tevent = new TimingsEvent(id, measurementCount, attSliceMillis, computeEventMillis);
         if (event.isLastEvent()) {
           tevent.setLast(true);
@@ -101,11 +110,16 @@ public final class LocalStatisticsProcessor implements Processor {
         timingsStream.put(tevent);
         attSliceMillis = 0;
         computeEventMillis = 0;
+        measurementCount++;
+        instancesSeen.clear();
+        // The problem here is that every reportingIncrement events, we create one of these events, but
+        // there are numOfBoosters slices sent for each instance, so for the instance that triggers the first
+        // message sending, the size of the set does not change until all the boosting stages have sent their
+        // ase messages, causing this message to be sent numOfBoosters times.
+        // If we clear the instances seen after each message is sent we forse the set to be refilled before
+        // another message is sent. I think this means that at worst we lost 1 instance/reportingIncrement
+        // instances from the measurements.
       }
-      AttributeSliceEvent ase = (AttributeSliceEvent) event;
-      processAttributeSlice(ase);
-      long attSliceEnd = timeUnit();
-      attSliceMillis += (attSliceEnd - start);
     } else {
       ComputeContentEvent cce = (ComputeContentEvent) event;
       processComputeEvent(cce);
@@ -251,12 +265,14 @@ public final class LocalStatisticsProcessor implements Processor {
     private boolean binarySplit = false;
     private AttributeClassObserver nominalClassObserver = new NominalAttributeClassObserver();
     private AttributeClassObserver numericClassObserver = new GaussianNumericAttributeClassObserver();
+    private int numBoostingStages;
 
     public Builder() {
 
     }
 
     public Builder(LocalStatisticsProcessor oldProcessor) {
+      this.numBoostingStages = oldProcessor.numBoostingStages;
       this.splitCriterion = oldProcessor.getSplitCriterion();
       this.binarySplit = oldProcessor.isBinarySplit();
       this.nominalClassObserver = oldProcessor.getNominalClassObserver();
@@ -280,6 +296,11 @@ public final class LocalStatisticsProcessor implements Processor {
 
     public Builder numericClassObserver(AttributeClassObserver numericClassObserver) {
       this.numericClassObserver = numericClassObserver;
+      return this;
+    }
+
+    public Builder numBoostingStages(int numLocalStats) {
+      this.numBoostingStages = numLocalStats;
       return this;
     }
 

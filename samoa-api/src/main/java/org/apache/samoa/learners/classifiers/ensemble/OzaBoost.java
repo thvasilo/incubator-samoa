@@ -75,6 +75,7 @@ public class OzaBoost extends BoostVHTProcessor {
   @Override
   protected void train(InstanceContentEvent inEvent) {
     Instance trainInstance = inEvent.getInstance();
+    long instanceIndex = inEvent.getInstanceIndex();
 
     this.trainingWeightSeenByModel++;
     double lambda_d = 1.0;
@@ -85,7 +86,7 @@ public class OzaBoost extends BoostVHTProcessor {
       if (k > 0) {
         Instance weightedInstance = trainInstance.copy();
         weightedInstance.setWeight(trainInstance.weight() * k);
-        mAPEnsemble[i].trainOnInstance(weightedInstance);
+        mAPEnsemble[i].trainOnInstance(weightedInstance, instanceIndex);
       }
       //get prediction for the instance from the specific learner of the ensemble
       double[] prediction = mAPEnsemble[i].getVotesForInstance(trainInstance);
