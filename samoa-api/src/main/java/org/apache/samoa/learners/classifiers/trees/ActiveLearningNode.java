@@ -138,6 +138,9 @@ public final class ActiveLearningNode extends LearningNode {
       AttributeSliceEvent attributeSliceEvent = new AttributeSliceEvent(
           instanceIndex, id, startingIndex, Integer.toString(localStatsIndex), isNominalSlice, attributeSlice,
           (int) inst.classValue(), inst.weight());
+      if (instanceIndex == -1) {
+        attributeSliceEvent.setLast(true);
+      }
       proc.sendToAttributeStream(attributeSliceEvent);
       startingIndex = endpoint;
     }

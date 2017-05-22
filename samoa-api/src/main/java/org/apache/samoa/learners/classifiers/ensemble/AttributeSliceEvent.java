@@ -31,6 +31,7 @@ public class AttributeSliceEvent implements ContentEvent{
   private int classValue;
   private double weight;
   private long instanceIndex;
+  private boolean isLast;
 
   public AttributeSliceEvent() {}
 
@@ -82,10 +83,15 @@ public class AttributeSliceEvent implements ContentEvent{
 
   @Override
   public void setKey(String key) {
+    this.key = key;
   }
 
   @Override
   public boolean isLastEvent() { // TODO
-    return false;
+    return isLast;
+  }
+
+  public void setLast(boolean last) {
+    isLast = last;
   }
 }

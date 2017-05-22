@@ -102,7 +102,7 @@ public final class LocalStatisticsProcessor implements Processor {
       long instanceIndex = ase.getInstanceIndex();
       instancesSeen.add(instanceIndex);
 
-      if (instancesSeen.size() % reportingIncrement == 0) {
+      if (instancesSeen.size() > reportingIncrement) {
         TimingsEvent tevent = new TimingsEvent(id, measurementCount, attSliceMillis, computeEventMillis);
         if (event.isLastEvent()) {
           tevent.setLast(true);

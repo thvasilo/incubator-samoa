@@ -28,6 +28,7 @@ import org.apache.samoa.topology.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Arrays;
 import java.util.Map;
 
 public class TimingsProcessor implements Processor {
@@ -61,33 +62,50 @@ public class TimingsProcessor implements Processor {
     TimingsEvent tevent = (TimingsEvent) event;
     Integer measurementID = tevent.getMeasurementID();
     Integer localStatsID = tevent.getLocalStatsID();
+//    System.out.printf("measurementID: %d. localstatsID: %d%n", measurementID, localStatsID);
     // TODO: Perhaps it would make sense to separate these two
     Long measurement = tevent.getAttSliceMillis() + tevent.getComputeEventMillis();
 
     // Get the correct row from the table
     Map<Integer, Long> localMeasurements = timings.row(measurementID);
     localMeasurements.put(localStatsID, measurement);
-
+    // If we have gathered all measurements report them
     if (localMeasurements.size() == numLocalStats) {
-      DescriptiveStatistics rowStats = new DescriptiveStatistics();
-      for (Long value : localMeasurements.values()) {
-        rowStats.addValue(value);
+      reportRow(localMeasurements, measurementID);
+    } else if (timings.rowMap().size() > 5) { // Else if the measurements are getting pretty big just report them
+      meanStats.clear();
+      for (Integer key : timings.rowKeySet()) {
+        reportRow(timings.row(key), key);
       }
-      double rowMean = rowStats.getMean();
-      logger.info("Measurement: {} Avg slice millis: {}",
-          measurementID, rowMean);
-      logger.info("95%% slice millis: {}",
-          rowStats.getPercentile(95));
-      meanStats.addValue(rowMean);
-      logger.info("Mean avg slice millis: {}",
-          meanStats.getMean());
-      // We are done with this measurement instance, so we can remove it
-      timings.row(measurementID).clear();
+    }
+
+    if (tevent.isLastEvent()) {
+      System.out.println("Timings size:" + timings.size());
     }
     // TODO: Handle case where we didn't manage to collect stats from all local stats processors at the end of the stream
 
 
     return true;
+  }
+
+  public void reportRow(Map<Integer, Long> localMeasurements, int measurementID) {
+    DescriptiveStatistics rowStats = new DescriptiveStatistics();
+    for (Long value : localMeasurements.values()) {
+      rowStats.addValue(value);
+    }
+    double rowMean = rowStats.getMean();
+    logger.info("Measurement: {} Values: {}",
+        measurementID, rowStats.getN());
+    logger.info("Avg slice millis: {}",
+        rowMean);
+    logger.info("95%% slice millis: {}",
+        rowStats.getPercentile(95));
+    meanStats.addValue(rowMean);
+    logger.info("Mean avg slice millis: {}",
+        meanStats.getMean());
+    // We are done with this measurement instance, so we can remove it
+//    timings.row(measurementID).clear();
+
   }
 
   @Override
