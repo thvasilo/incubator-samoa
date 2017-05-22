@@ -37,29 +37,24 @@ public final class LocalResultContentEvent implements ContentEvent {
   private final AttributeSplitSuggestion bestSuggestion;
   private final AttributeSplitSuggestion secondBestSuggestion;
   private final long splitId;
-  private final long attSliceMillis;
-  private final long computeEventMillis;
+
   private final int localStatsId;
   
-  private int ensembleId;//faye boostVHT
+  private int ensembleId;
 
   public LocalResultContentEvent() {
     bestSuggestion = null;
     secondBestSuggestion = null;
     splitId = -1;
-    attSliceMillis = 0;
-    computeEventMillis = 0;
     localStatsId = -1;
   }
 
-  LocalResultContentEvent(int localStatsId, long splitId, AttributeSplitSuggestion best, AttributeSplitSuggestion secondBest,
-                          long attSliceMillis, long computeEventMillis) {
+  LocalResultContentEvent(
+      int localStatsId, long splitId, AttributeSplitSuggestion best, AttributeSplitSuggestion secondBest) {
     this.localStatsId = localStatsId;
     this.splitId = splitId;
     this.bestSuggestion = best;
     this.secondBestSuggestion = secondBest;
-    this.attSliceMillis = attSliceMillis;
-    this.computeEventMillis = computeEventMillis;
   }
 
   @Override
@@ -112,14 +107,6 @@ public final class LocalResultContentEvent implements ContentEvent {
   
   public void setEnsembleId(int ensembleId) {
     this.ensembleId = ensembleId;
-  }
-
-  public long getAttSliceMillis() {
-    return attSliceMillis;
-  }
-
-  public long getComputeEventMillis() {
-    return computeEventMillis;
   }
 
   public int getLocalStatsId() {

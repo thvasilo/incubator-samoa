@@ -219,6 +219,15 @@ public class BoostVHT implements ClassificationLearner, Configurable {
     boostVHTProcessor.setResultStream(resultStream);
     boostVHTProcessor.setAttributeStream(attributeStream);
     boostVHTProcessor.setControlStream(controlStream);
+
+    // Create and connect the timings processor and stream
+    TimingsProcessor timingsProcessor = new TimingsProcessor(numLocalStats.getValue());
+    topologyBuilder.addProcessor(timingsProcessor);
+
+    Stream timingsStream = topologyBuilder.createStream(locStatProcessor);
+    locStatProcessor.setTimingsStream(timingsStream);
+    topologyBuilder.connectInputAllStream(timingsStream, timingsProcessor);
+
   }
 
   /** The topologyBuilder. */

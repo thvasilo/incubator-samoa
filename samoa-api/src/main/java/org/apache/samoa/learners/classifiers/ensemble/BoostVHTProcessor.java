@@ -95,11 +95,6 @@ abstract public class BoostVHTProcessor implements Processor {
 
   protected int maxBufferSize;
 
-  private Map<Integer, Pair<Long, Long>> timings;
-  private long instancesSeen = 0;
-  private DescriptiveStatistics sliceOverallMeans;
-  private DescriptiveStatistics computeOverallMeans;
-
   public BoostVHTProcessor() {}
 
   /**
@@ -111,7 +106,6 @@ abstract public class BoostVHTProcessor implements Processor {
   public boolean process(ContentEvent event) {
 
     if (event instanceof InstanceContentEvent) {
-      instancesSeen++;
       InstanceContentEvent inEvent = (InstanceContentEvent) event;
       //todo:: (Faye) check if any precondition is needed
 
@@ -120,30 +114,10 @@ abstract public class BoostVHTProcessor implements Processor {
 
       // estimate model parameters using the training data
       train(inEvent);
-      if ((instancesSeen % 10_000 == 0 || inEvent.isLastEvent()) && !timings.isEmpty()) {
-        DescriptiveStatistics sliceStats = new DescriptiveStatistics();
-        DescriptiveStatistics computeStats = new DescriptiveStatistics();
-        for (Pair<Long, Long> entry : timings.values()) {
-          sliceStats.addValue(entry.getLeft());
-          computeStats.addValue(entry.getRight());
-        }
 
-        logger.info("Avg slice millis: {}, avg compute millis: {}",
-            sliceStats.getMean(),
-            computeStats.getMean());
-        logger.info("95%% slice millis: {}, 95%% compute millis: {}",
-            sliceStats.getPercentile(95),
-            computeStats.getPercentile(95));
-        sliceOverallMeans.addValue(sliceStats.getMean());
-        computeOverallMeans.addValue(computeStats.getMean());
-        logger.info("Mean avg slice millis: {}, mean avg compute millis: {}",
-            sliceOverallMeans.getMean(),
-            computeOverallMeans.getMean());
-      }
     } else if (event instanceof LocalResultContentEvent) {
       LocalResultContentEvent lrce = (LocalResultContentEvent) event;
       mAPEnsemble[lrce.getEnsembleId()].updateModel(lrce);
-      timings.put(lrce.getLocalStatsId(), new ImmutablePair<>(lrce.getAttSliceMillis(), lrce.getComputeEventMillis()));
     }
 
 
@@ -177,9 +151,6 @@ abstract public class BoostVHTProcessor implements Processor {
       newProc.setControlStream(this.controlStream);
       mAPEnsemble[i] = newProc;
     }
-    timings = new HashMap<>(parallelismHint);
-    sliceOverallMeans = new DescriptiveStatistics();
-    computeOverallMeans = new DescriptiveStatistics();
   }
 
   abstract protected double[] predict(InstanceContentEvent inEvent);

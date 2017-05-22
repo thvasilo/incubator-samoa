@@ -27,6 +27,7 @@ import java.util.Map.Entry;
 import org.apache.samoa.core.ContentEvent;
 import org.apache.samoa.core.Processor;
 import org.apache.samoa.learners.classifiers.ensemble.AttributeSliceEvent;
+import org.apache.samoa.learners.classifiers.ensemble.TimingsEvent;
 import org.apache.samoa.moa.classifiers.core.AttributeSplitSuggestion;
 import org.apache.samoa.moa.classifiers.core.attributeclassobservers.AttributeClassObserver;
 import org.apache.samoa.moa.classifiers.core.attributeclassobservers.GaussianNumericAttributeClassObserver;
@@ -68,6 +69,9 @@ public final class LocalStatisticsProcessor implements Processor {
   private long attSliceMillis = 0;
   private long computeEventMillis = 0;
   private long sliceCount = 0;
+  private int measurementCount = 0;
+  private Stream timingsStream;
+  private int reportingIncrement = 1000; // TODO: Make configurable
 
   // the two observer classes below are also needed to be setup from the Tree
   private LocalStatisticsProcessor(Builder builder) {
@@ -88,7 +92,13 @@ public final class LocalStatisticsProcessor implements Processor {
 
     if (event instanceof AttributeSliceEvent) {
       sliceCount++;
-      if (sliceCount % 10_000 == 0) {
+      if (sliceCount % reportingIncrement == 0) {
+        measurementCount++;
+        TimingsEvent tevent = new TimingsEvent(id, measurementCount, attSliceMillis, computeEventMillis);
+        if (event.isLastEvent()) {
+          tevent.setLast(true);
+        }
+        timingsStream.put(tevent);
         attSliceMillis = 0;
         computeEventMillis = 0;
       }
@@ -103,11 +113,6 @@ public final class LocalStatisticsProcessor implements Processor {
       computeEventMillis += (computeEventEnd - start);
     }
 
-//    if (sliceCount % 10_000 == 0) {
-//      System.out.printf("LSP %d: Slice millis: %d, compute millis: %d%n", id,
-//          attSliceMillis,
-//          computeEventMillis);
-//    }
     return true;
   }
 
@@ -146,7 +151,7 @@ public final class LocalStatisticsProcessor implements Processor {
     }
     // create the local result content event
     LocalResultContentEvent lcre =
-        new LocalResultContentEvent(id, cce.getSplitId(), bestSuggestion, secondBestSuggestion, attSliceMillis, computeEventMillis);
+        new LocalResultContentEvent(id, cce.getSplitId(), bestSuggestion, secondBestSuggestion);
     lcre.setEnsembleId(cce.getEnsembleId()); //faye boostVHT
     computationResultStream.put(lcre);
   }
@@ -183,6 +188,7 @@ public final class LocalStatisticsProcessor implements Processor {
     LocalStatisticsProcessor newProcessor = new LocalStatisticsProcessor.Builder(oldProcessor).build();
 
     newProcessor.setComputationResultStream(oldProcessor.getComputationResultStream());
+    newProcessor.setTimingsStream(oldProcessor.getTimingsStream());
 
     return newProcessor;
   }
@@ -202,6 +208,35 @@ public final class LocalStatisticsProcessor implements Processor {
 
   private AttributeClassObserver newNumericClassObserver() {
     return new GaussianNumericAttributeClassObserver();
+  }
+
+
+  public SplitCriterion getSplitCriterion() {
+    return splitCriterion;
+  }
+
+  public boolean isBinarySplit() {
+    return binarySplit;
+  }
+
+  public AttributeClassObserver getNominalClassObserver() {
+    return nominalClassObserver;
+  }
+
+  public AttributeClassObserver getNumericClassObserver() {
+    return numericClassObserver;
+  }
+
+  public Stream getComputationResultStream() {
+    return computationResultStream;
+  }
+
+  public Stream getTimingsStream() {
+    return timingsStream;
+  }
+
+  public void setTimingsStream(Stream timingsStream) {
+    this.timingsStream = timingsStream;
   }
 
   /**
@@ -251,25 +286,5 @@ public final class LocalStatisticsProcessor implements Processor {
     public LocalStatisticsProcessor build() {
       return new LocalStatisticsProcessor(this);
     }
-  }
-  
-  public SplitCriterion getSplitCriterion() {
-    return splitCriterion;
-  }
-  
-  public boolean isBinarySplit() {
-    return binarySplit;
-  }
-  
-  public AttributeClassObserver getNominalClassObserver() {
-    return nominalClassObserver;
-  }
-  
-  public AttributeClassObserver getNumericClassObserver() {
-    return numericClassObserver;
-  }
-  
-  public Stream getComputationResultStream() {
-    return computationResultStream;
   }
 }
